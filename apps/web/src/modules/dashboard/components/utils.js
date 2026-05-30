@@ -57,9 +57,14 @@ export function resolveBoardColumn(row) {
 
 export function stepCompactLabel(row) {
   const code = String(row?.step_code || '').toUpperCase()
-  const order = Number(row?.current_step_order || row?.step_order || 0)
-  const stepNo = order > 0 ? Math.max(1, Math.floor(order / 10)) : 1
+  const stepNo = stepNumberFromRow(row)
   return `S${stepNo} ${STEP_SHORT_LABEL[code] || 'REG'}`
+}
+
+export function stepNumberFromRow(row) {
+  const order = Number(row?.current_step_order || row?.step_order || 0)
+  if (order <= 0) return 1
+  return Math.min(11, Math.max(1, Math.floor(order / 10)))
 }
 
 export function isFinishedRow(row) {

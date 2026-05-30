@@ -13,7 +13,7 @@ const DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 export default function ScheduleScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date().getDate());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear());
   const [calendar, setCalendar] = useState({ days: {} });
 
   useEffect(() => {
@@ -52,11 +52,33 @@ export default function ScheduleScreen() {
           }}
         />
         <View style={styles.calendarHeader}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setMonth((m) => (m === 1 ? 12 : m - 1))}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => {
+              setMonth((m) => {
+                if (m === 1) {
+                  setYear((y) => y - 1);
+                  return 12;
+                }
+                return m - 1;
+              });
+            }}
+          >
             <ChevronLeft color={theme.colors.text} size={24} />
           </TouchableOpacity>
           <Text style={styles.monthText}>{`${month} / ${year}`}</Text>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setMonth((m) => (m === 12 ? 1 : m + 1))}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => {
+              setMonth((m) => {
+                if (m === 12) {
+                  setYear((y) => y + 1);
+                  return 1;
+                }
+                return m + 1;
+              });
+            }}
+          >
             <ChevronRight color={theme.colors.text} size={24} />
           </TouchableOpacity>
         </View>

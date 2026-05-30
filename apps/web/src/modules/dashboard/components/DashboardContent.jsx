@@ -227,6 +227,14 @@ export function DashboardContent({ me }) {
     })
     return rows
   }, [queueRows, towerQ, towerBay, towerType, towerStatus])
+  const queueRowsFifo = useMemo(() => {
+    return [...queueRowsPrepared].sort((a, b) => {
+      const ta = new Date(a?.wo_created_at || a?.created_at || 0).getTime()
+      const tb = new Date(b?.wo_created_at || b?.created_at || 0).getTime()
+      if (ta !== tb) return ta - tb
+      return Number(a?.wo_id || 0) - Number(b?.wo_id || 0)
+    })
+  }, [queueRowsPrepared])
   const overSlaCount = queueRowsPrepared.filter((row) => Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0)).length
 
   const runningTextItems = useMemo(() => {
@@ -392,7 +400,7 @@ export function DashboardContent({ me }) {
           </div>
           <div className="slider-window">
             <div className="slider-track" style={{ '--slide-count': TOTAL_SLIDES, width: `${TOTAL_SLIDES * 100}%`, transform: `translateX(-${activeSlide * (100 / TOTAL_SLIDES)}%)` }}>
-              <SlideOneQueue settings={settings} queueRows={queueRowsPrepared} onRowClick={(row) => setSelectedWoId(row.wo_id)} isLoading={towerQuery.isLoading} error={towerQuery.error} now={now} />
+              <SlideOneQueue settings={settings} queueRows={queueRowsFifo} onRowClick={(row) => setSelectedWoId(row.wo_id)} isLoading={towerQuery.isLoading} error={towerQuery.error} now={now} />
               <SlideTwoControlTower settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} towerBay={towerBay} setTowerBay={setTowerBay} towerType={towerType} setTowerType={setTowerType} towerStatus={towerStatus} setTowerStatus={setTowerStatus} laneCards={boardBuckets} setSelectedWoId={setSelectedWoId} towerPageRows={towerRows.slice(0, 12)} towerTotal={towerRows.length} towerPage={1} towerPerPage={12} setTowerPerPage={() => {}} setTowerPage={() => {}} towerLastPage={1} towerQuery={towerQuery} isLoading={towerQuery.isLoading} error={towerQuery.error} bottleneckSummary={towerQuery.data?.bottlenecks || null} />
               {/* <SlideThreeSchedule
                 settings={settings}

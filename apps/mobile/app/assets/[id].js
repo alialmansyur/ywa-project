@@ -35,6 +35,7 @@ export default function AssetDetailScreen() {
     schedules: [],
     workshopHistory: [],
     documents: [],
+    kpis: { breakdown_count: 0, findings_count: 0 },
   });
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function AssetDetailScreen() {
         const data = await assetsService.getDetailByRef(String(id));
         setBundle(data);
       } catch (_e) {
-        setBundle({ asset: null, photos: [], preventive: null, schedules: [], workshopHistory: [], documents: [] });
+        setBundle({ asset: null, photos: [], preventive: null, schedules: [], workshopHistory: [], documents: [], kpis: { breakdown_count: 0, findings_count: 0 } });
       } finally {
         setLoading(false);
       }
@@ -146,6 +147,8 @@ export default function AssetDetailScreen() {
       <Card style={styles.card}>
         <View style={styles.kpiRow}><Clock size={18} color={theme.colors.warning} /><Text style={styles.kpiText}>Downtime Total: {totalDowntimeHours} jam</Text></View>
         <View style={styles.kpiRow}><Wrench size={18} color={theme.colors.error} /><Text style={styles.kpiText}>Biaya Total: Rp {Number(totalCost).toLocaleString('id-ID')}</Text></View>
+        <View style={styles.kpiRow}><FileText size={18} color={theme.colors.primary} /><Text style={styles.kpiText}>Total Breakdown: {Number(bundle.kpis?.breakdown_count || 0)}</Text></View>
+        <View style={styles.kpiRow}><ShieldCheck size={18} color={theme.colors.success} /><Text style={styles.kpiText}>Total Temuan: {Number(bundle.kpis?.findings_count || 0)}</Text></View>
       </Card>
       {bundle.workshopHistory.length === 0 ? <Card style={styles.card}><Text style={styles.empty}>Belum ada history workshop.</Text></Card> : bundle.workshopHistory.map((h) => (
         <Card key={h.id} style={styles.card}>

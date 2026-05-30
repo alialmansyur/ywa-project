@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\WorkOrder\WorkOrderController;
 use App\Http\Controllers\Controller;
 use App\Models\BreakdownReport;
 use App\Services\Approval\ApprovalWorkflowService;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -87,6 +88,19 @@ class BreakdownReportController extends Controller
             return $report;
         });
 
+        NotificationDispatcherService::dispatchToAdmins(
+            'Laporan Breakdown Baru',
+            'Laporan ' . $report->report_no . ' menunggu tindak lanjut.',
+            [
+                'route' => '/breakdown-reports',
+                'entity_type' => 'breakdown_report',
+                'entity_id' => $report->id,
+                'report_no' => $report->report_no,
+                'asset_id' => $report->asset_id,
+            ],
+            'breakdown_event'
+        );
+
         return response()->json([
             'message' => $approvalTemplate
                 ? 'Laporan breakdown berhasil dibuat dan menunggu approval.'
@@ -121,6 +135,21 @@ class BreakdownReportController extends Controller
         }
 
         $breakdownReport->update($validated);
+
+        if (array_key_exists('status', $validated) && in_array($validated['status'], ['processed', 'done', 'cancelled'], true)) {
+            NotificationDispatcherService::dispatchToUser(
+                (int) $breakdownReport->reporter_id,
+                'Laporan Breakdown Ditanggapi',
+                'Laporan ' . $breakdownReport->report_no . ' telah mendapatkan feedback.',
+                [
+                    'route' => '/report',
+                    'entity_type' => 'breakdown_report',
+                    'entity_id' => $breakdownReport->id,
+                    'status' => $validated['status'],
+                ],
+                'breakdown_event'
+            );
+        }
 
         return response()->json([
             'message' => 'Laporan breakdown berhasil diperbarui.',

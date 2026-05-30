@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, TextInput, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, TextInput, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { theme } from '../../constants/AppTheme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -140,6 +140,28 @@ export default function ProfileScreen() {
   };
 
   const pickAvatar = async (fromCamera = false) => {
+    if (fromCamera) {
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!cameraPermission.granted) {
+        showAlert({
+          title: 'Izin Kamera Diperlukan',
+          message: 'Silakan izinkan akses kamera untuk mengambil avatar.',
+          type: 'warning',
+        });
+        return;
+      }
+    } else {
+      const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!mediaPermission.granted) {
+        showAlert({
+          title: 'Izin Galeri Diperlukan',
+          message: 'Silakan izinkan akses galeri untuk memilih avatar.',
+          type: 'warning',
+        });
+        return;
+      }
+    }
+
     const result = fromCamera
       ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6, allowsEditing: true, aspect: [1, 1] })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, allowsEditing: true, aspect: [1, 1] });
@@ -341,7 +363,7 @@ export default function ProfileScreen() {
 
       {/* Modal Setup */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={closeModal} statusBarTranslucent={true}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -359,8 +381,6 @@ export default function ProfileScreen() {
                 <>
                   <Text style={styles.inputLabel}>Nama Lengkap</Text>
                   <TextInput style={styles.input} value={profileName} onChangeText={setProfileName} placeholderTextColor={theme.colors.textSecondary} />
-                  <Text style={styles.inputLabel}>Jabatan / Posisi</Text>
-                  <TextInput style={styles.input} value={profileRole} onChangeText={setProfileRole} placeholderTextColor={theme.colors.textSecondary} editable={false} />
                   <Text style={styles.inputLabel}>Nomor Telepon</Text>
                   <TextInput style={styles.input} value={profilePhone} onChangeText={setProfilePhone} placeholderTextColor={theme.colors.textSecondary} />
                 </>
@@ -474,7 +494,7 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
@@ -706,9 +726,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.borderRadius.lg,
     borderTopRightRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    paddingBottom: 60, // Padding for safe area
+    paddingBottom: 20,
     width: '100%',
-    marginBottom: -40, // Force push down to cover any native gaps
+    marginBottom: 0,
     maxHeight: '90%',
   },
   modalHeader: {

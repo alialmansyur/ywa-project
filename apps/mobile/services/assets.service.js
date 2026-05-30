@@ -58,13 +58,14 @@ export const assetsService = {
 
   getDetailByRef: async (assetRef) => {
     const encodedRef = encodeURIComponent(assetRef);
-    const [detail, photos, preventive, schedules, workshopHistory, documents] = await Promise.all([
+    const [detail, photos, preventive, schedules, workshopHistory, documents, kpis] = await Promise.all([
       apiClient.get(`/assets/detail/${encodedRef}`),
       apiClient.get(`/assets/detail/${encodedRef}/photos`),
       apiClient.get(`/assets/detail/${encodedRef}/preventive`),
       apiClient.get(`/assets/detail/${encodedRef}/schedules`),
       apiClient.get(`/assets/detail/${encodedRef}/workshop-history`, { params: { per_page: 50 } }),
       apiClient.get(`/assets/detail/${encodedRef}/documents`),
+      apiClient.get(`/assets/detail/${encodedRef}/kpis`),
     ]);
 
     return {
@@ -74,6 +75,7 @@ export const assetsService = {
       schedules: schedules.data?.data || [],
       workshopHistory: workshopHistory.data?.data || [],
       documents: documents.data?.data || [],
+      kpis: kpis.data?.data || { breakdown_count: 0, findings_count: 0 },
     };
   },
 

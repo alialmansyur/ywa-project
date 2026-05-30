@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Finding;
 use App\Http\Controllers\Controller;
 use App\Models\Finding;
 use App\Services\Approval\ApprovalWorkflowService;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -154,6 +155,19 @@ class FindingController extends Controller
             return $finding;
         });
 
+        NotificationDispatcherService::dispatchToAdmins(
+            'Temuan Baru Masuk',
+            'Temuan ' . $finding->code . ' menunggu tindak lanjut.',
+            [
+                'route' => '/findings',
+                'entity_type' => 'finding',
+                'entity_id' => $finding->id,
+                'code' => $finding->code,
+                'asset_id' => $finding->asset_id,
+            ],
+            'finding_event'
+        );
+
         return response()->json([
             'message' => $approvalTemplate
                 ? 'Temuan berhasil dibuat dan menunggu approval.'
@@ -190,6 +204,21 @@ class FindingController extends Controller
         }
 
         $finding->update($validated);
+
+        if (($validated['status'] ?? null) === 'resolved') {
+            NotificationDispatcherService::dispatchToUser(
+                (int) $finding->reporter_id,
+                'Temuan Ditanggapi',
+                'Temuan ' . $finding->code . ' telah mendapatkan feedback.',
+                [
+                    'route' => '/findings',
+                    'entity_type' => 'finding',
+                    'entity_id' => $finding->id,
+                    'status' => 'resolved',
+                ],
+                'finding_event'
+            );
+        }
 
         return response()->json([
             'message' => 'Temuan berhasil diperbarui.',

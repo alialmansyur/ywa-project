@@ -526,7 +526,7 @@ class ReportController extends Controller
 
         $headers = $headersByType[$type] ?? ['Data'];
         foreach ($headers as $index => $header) {
-            $sheet->setCellValueByColumnAndRow($index + 1, 1, $header);
+            $sheet->setCellValue([$index + 1, 1], $header);
         }
 
         $rowNum = 2;
@@ -546,7 +546,7 @@ class ReportController extends Controller
             };
 
             foreach ($values as $index => $value) {
-                $sheet->setCellValueByColumnAndRow($index + 1, $rowNum, $value);
+                $sheet->setCellValue([$index + 1, $rowNum], $value);
             }
             $rowNum++;
         }

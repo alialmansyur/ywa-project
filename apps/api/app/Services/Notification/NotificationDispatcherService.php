@@ -11,22 +11,68 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationDispatcherService
 {
-    public static function dispatchToAdmins(string $title, string $body, array $data = []): void
+    public static function dispatchToAdmins(string $title, string $body, array $data = [], string $type = 'system'): void
+    {
+        self::dispatchToRoles(['admin', 'superadmin'], $title, $body, $data, $type);
+    }
+
+    public static function dispatchToUser(int $userId, string $title, string $body, array $data = [], string $type = 'system'): void
     {
         try {
-            $admins = User::role('admin')->where('is_active', true)->get(['id']);
-            foreach ($admins as $admin) {
-                AppNotification::query()->create([
-                    'user_id' => $admin->id,
-                    'type' => 'system',
+            $target = User::query()->where('id', $userId)->where('is_active', true)->first(['id']);
+            if (! $target) {
+                return;
+            }
+
+            $notification = AppNotification::query()->create([
+                'user_id' => $target->id,
+                'type' => $type,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+                'is_read' => false,
+            ]);
+
+            SendPushNotificationJob::dispatch(
+                (int) $target->id,
+                (int) $notification->id,
+                $title,
+                $body,
+                $data,
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch user notification: ' . $e->getMessage());
+        }
+    }
+
+    public static function dispatchToRoles(array $roles, string $title, string $body, array $data = [], string $type = 'system'): void
+    {
+        try {
+            $targets = User::query()
+                ->role($roles)
+                ->where('is_active', true)
+                ->get(['id']);
+
+            foreach ($targets as $target) {
+                $notification = AppNotification::query()->create([
+                    'user_id' => $target->id,
+                    'type' => $type,
                     'title' => $title,
                     'body' => $body,
                     'data' => $data,
                     'is_read' => false,
                 ]);
+
+                SendPushNotificationJob::dispatch(
+                    (int) $target->id,
+                    (int) $notification->id,
+                    $title,
+                    $body,
+                    $data,
+                );
             }
         } catch (\Throwable $e) {
-            Log::warning('Failed to dispatch admin notification: ' . $e->getMessage());
+            Log::warning('Failed to dispatch role notification: ' . $e->getMessage());
         }
     }
 

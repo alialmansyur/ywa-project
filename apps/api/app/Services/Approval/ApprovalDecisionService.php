@@ -9,6 +9,7 @@ use App\Models\Inventory;
 use App\Models\InventoryTransaction;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatusLog;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Support\Facades\DB;
 
 class ApprovalDecisionService
@@ -153,12 +154,44 @@ class ApprovalDecisionService
     private function applyApproved(object $request): void
     {
         if ($request->reference_type === Finding::class) {
-            Finding::where('id', $request->reference_id)->update(['status' => 'submitted']);
+            $finding = Finding::find($request->reference_id);
+            if (! $finding) {
+                return;
+            }
+            $finding->update(['status' => 'submitted']);
+            NotificationDispatcherService::dispatchToUser(
+                (int) $finding->reporter_id,
+                'Temuan Disetujui',
+                'Temuan ' . $finding->code . ' telah disetujui.',
+                [
+                    'route' => '/findings',
+                    'entity_type' => 'finding',
+                    'entity_id' => $finding->id,
+                    'status' => 'submitted',
+                ],
+                'finding_event'
+            );
             return;
         }
 
         if ($request->reference_type === BreakdownReport::class) {
-            BreakdownReport::where('id', $request->reference_id)->update(['status' => 'submitted']);
+            $report = BreakdownReport::find($request->reference_id);
+            if (! $report) {
+                return;
+            }
+            $report->update(['status' => 'submitted']);
+            NotificationDispatcherService::dispatchToUser(
+                (int) $report->reporter_id,
+                'Laporan Breakdown Disetujui',
+                'Laporan ' . $report->report_no . ' telah disetujui.',
+                [
+                    'route' => '/report',
+                    'entity_type' => 'breakdown_report',
+                    'entity_id' => $report->id,
+                    'status' => 'submitted',
+                ],
+                'breakdown_event'
+            );
             return;
         }
 
@@ -209,7 +242,44 @@ class ApprovalDecisionService
     private function applyRejected(object $request): void
     {
         if ($request->reference_type === BreakdownReport::class) {
-            BreakdownReport::where('id', $request->reference_id)->update(['status' => 'cancelled']);
+            $report = BreakdownReport::find($request->reference_id);
+            if (! $report) {
+                return;
+            }
+            $report->update(['status' => 'cancelled']);
+            NotificationDispatcherService::dispatchToUser(
+                (int) $report->reporter_id,
+                'Laporan Breakdown Ditolak',
+                'Laporan ' . $report->report_no . ' ditolak.',
+                [
+                    'route' => '/report',
+                    'entity_type' => 'breakdown_report',
+                    'entity_id' => $report->id,
+                    'status' => 'cancelled',
+                ],
+                'breakdown_event'
+            );
+            return;
+        }
+
+        if ($request->reference_type === Finding::class) {
+            $finding = Finding::find($request->reference_id);
+            if (! $finding) {
+                return;
+            }
+            $finding->update(['status' => 'in_review']);
+            NotificationDispatcherService::dispatchToUser(
+                (int) $finding->reporter_id,
+                'Temuan Ditolak',
+                'Temuan ' . $finding->code . ' ditolak.',
+                [
+                    'route' => '/findings',
+                    'entity_type' => 'finding',
+                    'entity_id' => $finding->id,
+                    'status' => 'in_review',
+                ],
+                'finding_event'
+            );
             return;
         }
 

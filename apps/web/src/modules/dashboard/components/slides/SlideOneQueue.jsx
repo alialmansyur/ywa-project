@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import { elapsedSeconds, fmtElapsed, statusClass, stepCompactLabel } from '../utils'
+import { elapsedSeconds, fmtElapsed, statusClass, stepCompactLabel, stepNumberFromRow } from '../utils'
 
 export function SlideOneQueue({ settings, queueRows, onRowClick, isLoading, error, now }) {
   const tableWrapRef = useRef(null)
@@ -86,7 +86,7 @@ export function SlideOneQueue({ settings, queueRows, onRowClick, isLoading, erro
                     <div className="unit-name">{row.asset_name || row.asset?.name || '-'}</div>
                     <div className="unit-sub">{row.asset_code || row.asset?.code || '-'} · {row.police_no || row.license_plate || row.nopol || row.asset?.police_no || row.asset?.license_plate || '-'}</div>
                   </td>
-                  <td>{stepCompactLabel(row)}<br />{row.step_name || '-'}</td>
+                  <td>{stepCompactLabel(row)} (Step {stepNumberFromRow(row)}/11)<br />{row.step_name || '-'}</td>
                   <td>{row.wo_created_at ? new Date(row.wo_created_at).toLocaleTimeString('id-ID', { hour12: false }) : '-'}</td>
                   <td className="queue-timer">{fmtElapsed(elapsedSeconds(row, now.getTime()))}</td>
                   <td className={Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0) ? 'queue-over' : 'queue-safe'}>

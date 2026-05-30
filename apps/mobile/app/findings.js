@@ -106,6 +106,16 @@ export default function FindingsScreen() {
   }
 
   const pickPhoto = async () => {
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!cameraPermission.granted) {
+      showAlert({
+        title: 'Izin Kamera Diperlukan',
+        message: 'Silakan izinkan akses kamera agar bisa mengambil foto temuan.',
+        type: 'warning',
+      });
+      return;
+    }
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.6,

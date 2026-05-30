@@ -408,7 +408,7 @@ export function InventoryPage() {
 
     setSubmitLoading(true)
     try {
-      await apiRequest('/inventory/transactions', {
+      const response = await apiRequest('/inventory/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -422,7 +422,11 @@ export function InventoryPage() {
           location: txForm.location || 'gudang-utama',
         }),
       })
-      await swal.fire({ icon: 'success', title: 'Berhasil', text: 'Transaksi inventory berhasil disimpan.' })
+      await swal.fire({
+        icon: 'success',
+        title: response?.approval_required ? 'Menunggu Approval' : 'Berhasil',
+        text: response?.message || 'Transaksi inventory berhasil disimpan.',
+      })
       setTxModalOpen(false)
       await fetchData()
       if (selected?.id && Number(txForm.part_id) === selected.id) {

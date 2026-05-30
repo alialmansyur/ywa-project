@@ -9,7 +9,7 @@ import { notificationsService } from '../services/notifications.service';
 import { useNotificationStore } from '../stores/notification.store';
 
 export default function NotificationsScreen() {
-  const { notifications, setNotifications, markAsRead, removeNotification } = useNotificationStore();
+  const { notifications, setNotifications, markAsRead, markAllAsRead, removeNotification } = useNotificationStore();
   const unreadNotifications = notifications.filter((n) => !(n.read || n.is_read));
 
   useEffect(() => {
@@ -28,6 +28,13 @@ export default function NotificationsScreen() {
       await notificationsService.markRead(id);
       markAsRead(id);
       removeNotification(id);
+    } catch (_e) {}
+  };
+
+  const readAll = async () => {
+    try {
+      await notificationsService.markAllRead();
+      markAllAsRead();
     } catch (_e) {}
   };
 
@@ -68,12 +75,19 @@ export default function NotificationsScreen() {
           <Text style={styles.emptyText}>Tidak ada notifikasi baru.</Text>
         </View>
       ) : (
-        <FlatList
-          data={unreadNotifications}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-        />
+        <>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.readAllBtn} onPress={readAll} activeOpacity={0.7}>
+              <Text style={styles.readAllTxt}>Read All</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={unreadNotifications}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+          />
+        </>
       )}
     </View>
   );
@@ -92,4 +106,7 @@ const styles = StyleSheet.create({
   readTxt: { color: theme.colors.primary, fontSize: 12, fontWeight: '600' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: theme.spacing.md },
+  actionRow: { paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, alignItems: 'flex-end' },
+  readAllBtn: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: theme.colors.primaryLight, borderRadius: theme.borderRadius.md },
+  readAllTxt: { color: theme.colors.primary, fontSize: 12, fontWeight: '700' },
 });
