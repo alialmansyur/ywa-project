@@ -1,0 +1,184 @@
+<?php
+
+namespace App\Services\Notification;
+
+use App\Jobs\SendPushNotificationJob;
+use App\Models\AppNotification;
+use App\Models\User;
+use App\Models\WorkOrder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+
+class NotificationDispatcherService
+{
+    public static function dispatchToAdmins(string $title, string $body, array $data = []): void
+    {
+        try {
+            $admins = User::role('admin')->where('is_active', true)->get(['id']);
+            foreach ($admins as $admin) {
+                AppNotification::query()->create([
+                    'user_id' => $admin->id,
+                    'type' => 'system',
+                    'title' => $title,
+                    'body' => $body,
+                    'data' => $data,
+                    'is_read' => false,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch admin notification: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Dispatch in-app notification (and optional push) for work-order events.
+     */
+    public function dispatchWorkOrderEvent(WorkOrder $workOrder, string $eventKey, ?User $actor = null, array $meta = []): void
+    {
+        if (! $this->supportsEvent($eventKey)) {
+            return;
+        }
+
+        [$title, $body] = $this->buildMessage($workOrder, $eventKey, $meta);
+        $priority = $this->resolvePriority($eventKey);
+
+        $payload = [
+            'event_key' => $eventKey,
+            'entity_type' => 'work_order',
+            'entity_id' => $workOrder->id,
+            'work_order_id' => $workOrder->id,
+            'work_order_code' => $workOrder->code,
+            'route' => '/workshop/detail?work_order_id=' . $workOrder->id,
+            'admin_route' => '/work-orders',
+            'priority' => $priority,
+            'actor_id' => $actor?->id,
+            'actor_name' => $actor?->name,
+            'occurred_at' => now()->toISOString(),
+            'meta' => $meta,
+        ];
+
+        $targets = $this->resolveTargets($workOrder, $eventKey, $actor);
+
+        foreach ($targets as $target) {
+            $notification = AppNotification::query()->create([
+                'user_id' => $target->id,
+                'type' => 'work_order_event',
+                'title' => $title,
+                'body' => $body,
+                'data' => $payload,
+                'is_read' => false,
+            ]);
+
+            if ($this->shouldPush($eventKey)) {
+                SendPushNotificationJob::dispatch(
+                    (int) $target->id,
+                    (int) $notification->id,
+                    $title,
+                    $body,
+                    $payload,
+                );
+            }
+        }
+    }
+
+    /**
+     * @return array{0:string,1:string}
+     */
+    private function buildMessage(WorkOrder $workOrder, string $eventKey, array $meta): array
+    {
+        $woCode = $workOrder->code ?? ('WO-' . $workOrder->id);
+        $step = $meta['step_name'] ?? ('Step ' . ($meta['step_order'] ?? '-'));
+
+        return match ($eventKey) {
+            'PROCESS_STARTED' => [
+                "Process Dimulai - {$woCode}",
+                "Work order {$woCode} telah memasuki proses workshop.",
+            ],
+            'STEP_HOLD' => [
+                "Step Hold - {$woCode}",
+                "{$step} pada {$woCode} di-hold. Segera lakukan follow-up.",
+            ],
+            'STEP_REJECTED' => [
+                "Step Ditolak - {$woCode}",
+                "{$step} pada {$woCode} ditolak dan perlu tindak lanjut.",
+            ],
+            'STEP_APPROVED' => [
+                "Step Disetujui - {$woCode}",
+                "{$step} pada {$woCode} telah disetujui.",
+            ],
+            'PROCESS_COMPLETED' => [
+                "Process Selesai - {$woCode}",
+                "Work order {$woCode} telah selesai diproses.",
+            ],
+            default => [
+                "Update Work Order - {$woCode}",
+                "Terjadi event {$eventKey} pada work order {$woCode}.",
+            ],
+        };
+    }
+
+    private function resolvePriority(string $eventKey): string
+    {
+        return match ($eventKey) {
+            'STEP_HOLD', 'STEP_REJECTED' => 'high',
+            'PROCESS_STARTED', 'STEP_APPROVED' => 'medium',
+            default => 'low',
+        };
+    }
+
+    private function shouldPush(string $eventKey): bool
+    {
+        return in_array($eventKey, [
+            'PROCESS_STARTED',
+            'STEP_HOLD',
+            'STEP_REJECTED',
+            'STEP_APPROVED',
+            'PROCESS_COMPLETED',
+        ], true);
+    }
+
+    private function supportsEvent(string $eventKey): bool
+    {
+        return in_array($eventKey, [
+            'PROCESS_STARTED',
+            'STEP_HOLD',
+            'STEP_REJECTED',
+            'STEP_APPROVED',
+            'PROCESS_COMPLETED',
+        ], true);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    private function resolveTargets(WorkOrder $workOrder, string $eventKey, ?User $actor): Collection
+    {
+        $targetIds = collect([
+            $workOrder->created_by,
+            $workOrder->supervisor_id,
+            $workOrder->approved_by,
+        ])->filter();
+
+        $assigneeIds = $workOrder->assignees()->pluck('users.id');
+        $targetIds = $targetIds->merge($assigneeIds);
+
+        if (in_array($eventKey, ['STEP_HOLD', 'STEP_REJECTED'], true)) {
+            $approverIds = User::permission('approve work-orders')->pluck('id');
+            $targetIds = $targetIds->merge($approverIds);
+        }
+
+        if ($actor?->id) {
+            $targetIds = $targetIds->reject(fn ($id) => (int) $id === (int) $actor->id);
+        }
+
+        $ids = $targetIds->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereIn('id', $ids)
+            ->where('is_active', true)
+            ->get(['id', 'name']);
+    }
+}

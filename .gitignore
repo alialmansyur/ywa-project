@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Backups
+backups/mysql/*.sql
+backups/mysql/*.tar.gz
+!backups/mysql/.gitkeep
+
+# Node modules
+node_modules/
+apps/web/node_modules/
+apps/admin/node_modules/
+apps/mobile/node_modules/
+
+# Build outputs
+apps/web/dist/
+apps/admin/dist/
+apps/mobile/.expo/
+
+# Laravel
+apps/api/vendor/
+apps/api/storage/logs/*.log
+apps/api/storage/app/public/
+apps/api/.env
+apps/api/.phpunit.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml

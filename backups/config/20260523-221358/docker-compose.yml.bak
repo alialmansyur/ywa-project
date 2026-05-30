@@ -1,0 +1,229 @@
+networks:
+  tapg-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+  minio-data:
+  api-vendor:
+  api-storage:
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: tapg-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Jakarta
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backups/mysql:/backups
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    ports:
+      - "8006:3306"
+    networks: [tapg-network]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: tapg-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "8007:6379"
+    networks: [tapg-network]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  laravel-api:
+    build:
+      context: ./apps/api
+      dockerfile: ../../docker/api/Dockerfile
+    container_name: tapg-laravel-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_KEY: ${APP_KEY}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      AWS_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_BUCKET: ${AWS_BUCKET}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:8005}
+      FILESYSTEM_DISK: s3
+    volumes:
+      - ./apps/api:/var/www/html
+      - api-vendor:/var/www/html/vendor
+      - api-storage:/var/www/html/storage/app
+    expose:
+      - "9000"
+    networks: [tapg-network]
+
+  queue-worker:
+    build:
+      context: ./apps/api
+      dockerfile: ../../docker/api/Dockerfile
+    container_name: tapg-queue-worker
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=default,notifications,exports --sleep=3 --tries=3 --max-time=3600
+    depends_on:
+      - laravel-api
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      QUEUE_CONNECTION: redis
+    volumes:
+      - ./apps/api:/var/www/html
+      - api-vendor:/var/www/html/vendor
+      - api-storage:/var/www/html/storage/app
+    networks: [tapg-network]
+
+  scheduler:
+    build:
+      context: ./apps/api
+      dockerfile: ../../docker/api/Dockerfile
+    container_name: tapg-scheduler
+    restart: unless-stopped
+    command: php artisan schedule:work
+    depends_on:
+      - laravel-api
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - ./apps/api:/var/www/html
+      - api-vendor:/var/www/html/vendor
+      - api-storage:/var/www/html/storage/app
+    networks: [tapg-network]
+
+  nginx:
+    image: nginx:alpine
+    container_name: tapg-nginx
+    restart: unless-stopped
+    depends_on:
+      - laravel-api
+    ports:
+      - "8000:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./apps/api:/var/www/html:ro
+    networks: [tapg-network]
+
+  react-web:
+    image: node:20-alpine
+    container_name: tapg-react-web
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install --legacy-peer-deps && npm run build && npm run preview -- --host 0.0.0.0 --port 8001"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      VITE_API_PROXY_TARGET: http://nginx:80
+      VITE_REVERB_HOST: ${VITE_REVERB_HOST:-localhost}
+      VITE_REVERB_KEY: ${VITE_REVERB_KEY:-}
+    volumes:
+      - ./apps/web:/app
+    ports:
+      - "8001:8001"
+    networks: [tapg-network]
+
+  react-admin:
+    image: node:20-alpine
+    container_name: tapg-react-admin
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install --legacy-peer-deps && npm run build && npm run preview -- --host 0.0.0.0 --port 8002"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      VITE_API_PROXY_TARGET: http://nginx:80
+      VITE_REVERB_HOST: ${VITE_REVERB_HOST:-localhost}
+      VITE_REVERB_KEY: ${VITE_REVERB_KEY:-}
+    volumes:
+      - ./apps/admin:/app
+    ports:
+      - "8002:8002"
+    networks: [tapg-network]
+
+  minio:
+    image: minio/minio:latest
+    container_name: tapg-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "8005:9000"
+      - "8004:9001"
+    networks: [tapg-network]
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: tapg-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      PMA_ARBITRARY: 1
+    ports:
+      - "8003:80"
+    networks: [tapg-network]

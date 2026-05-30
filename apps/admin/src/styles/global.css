@@ -1,0 +1,510 @@
+:root {
+  --admin-ui-scale: 1.12;
+  --admin-header-height: calc(72px * var(--admin-ui-scale));
+}
+
+html {
+  font-size: calc(16px * var(--admin-ui-scale));
+}
+
+body {
+  font-size: 1rem;
+}
+
+/* Global admin UI scaling across pages/themes */
+.admin-ui-root .card,
+.admin-ui-root .stat-card,
+.admin-ui-root .btn-primary,
+.admin-ui-root .btn-secondary,
+.admin-ui-root .input,
+.admin-ui-root input,
+.admin-ui-root select,
+.admin-ui-root textarea,
+.admin-ui-root table,
+.admin-ui-root th,
+.admin-ui-root td,
+.admin-ui-root a {
+  font-size: 1rem;
+}
+
+.admin-ui-root button {
+  font-size: 0.95rem;
+}
+
+.admin-ui-root h1 { font-size: 1.85rem; }
+.admin-ui-root h2 { font-size: 1.55rem; }
+.admin-ui-root h3 { font-size: 1.3rem; }
+.admin-ui-root thead th { font-size: 0.82rem; }
+.admin-ui-root tbody td { font-size: 0.82rem; }
+
+.admin-sidebar.w-16 {
+  width: calc(4rem * var(--admin-ui-scale));
+}
+
+.admin-sidebar.w-64 {
+  width: calc(16rem * var(--admin-ui-scale));
+}
+
+.admin-sidebar [class*="h-\\[72px\\]"] {
+  height: var(--admin-header-height);
+}
+
+.admin-sidebar [class*="w-9"][class*="h-9"] {
+  width: calc(2.25rem * var(--admin-ui-scale));
+  height: calc(2.25rem * var(--admin-ui-scale));
+}
+
+.admin-sidebar [class*="w-8"][class*="h-8"] {
+  width: calc(2rem * var(--admin-ui-scale));
+  height: calc(2rem * var(--admin-ui-scale));
+}
+
+.admin-sidebar [class*="w-10"][class*="h-10"] {
+  width: calc(2.5rem * var(--admin-ui-scale));
+  height: calc(2.5rem * var(--admin-ui-scale));
+}
+
+.admin-topbar {
+  height: var(--admin-header-height);
+  padding-left: calc(1.5rem * var(--admin-ui-scale));
+  padding-right: calc(1.5rem * var(--admin-ui-scale));
+  gap: calc(1rem * var(--admin-ui-scale));
+}
+
+.admin-topbar,
+.admin-sidebar > div:first-child {
+  box-sizing: border-box;
+  min-height: var(--admin-header-height);
+  max-height: var(--admin-header-height);
+}
+
+.admin-topbar [class*="w-10"][class*="h-10"] {
+  width: calc(2.5rem * var(--admin-ui-scale));
+  height: calc(2.5rem * var(--admin-ui-scale));
+}
+
+.admin-topbar input[type="text"] {
+  min-height: calc(2.25rem * var(--admin-ui-scale));
+  font-size: 0.95rem;
+}
+
+.admin-topbar h1 {
+  font-size: 0.9rem !important;
+  line-height: 1.2 !important;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .admin-topbar h1 {
+    font-size: 1rem !important;
+  }
+}
+
+.custom-scroll::-webkit-scrollbar { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.3); border-radius: 99px; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.card { background: #1e293b; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.stat-card { background: linear-gradient(135deg, #1e293b, #1a2540); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+.btn-primary { background: linear-gradient(135deg,#10b981,#059669); transition: all .2s; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+.btn-secondary { background: rgba(51,65,85,0.8); border: 1px solid rgba(255,255,255,0.08); transition: all .2s; }
+.btn-secondary:hover { background: rgba(71,85,105,0.8); }
+.input { background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.08); color: white; transition: border-color .2s; }
+.input:focus { border-color: #10b981; outline: none; }
+table { border-collapse: collapse; }
+tr { transition: background .15s; }
+tbody tr:hover { background: rgba(51,65,85,0.3); }
+
+#sidebar nav a[class*="bg-blue-500"] .bg-blue-400,
+#sidebar nav button[class*="bg-blue-500"] .bg-blue-400 {
+  background-color: #6ee7b7 !important;
+}
+
+/* Sidebar user avatar: keep both themes soft and flat */
+#sidebar > div:last-child .bg-gradient-to-br {
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #6ee7b7 !important;
+  box-shadow: none !important;
+}
+
+/* Dark theme action buttons: keep text readable on soft accent backgrounds */
+html:not(.theme-light) .admin-ui-root button[class*="bg-blue-500/"],
+html:not(.theme-light) .admin-ui-root button[class*="bg-emerald-500/"],
+html:not(.theme-light) .admin-ui-root button[class*="bg-green-500/"],
+html:not(.theme-light) .admin-ui-root button[class*="bg-yellow-500/"],
+html:not(.theme-light) .admin-ui-root button[class*="bg-red-500/"],
+html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
+  color: #ffffff !important;
+}
+
+/* Light theme overrides controlled by documentElement.theme-light */
+.theme-light {
+  --lt-bg: #f7f7f7;
+  --lt-surface: #ffffff;
+  --lt-surface-soft: #ffffff;
+  --lt-panel: #ffffff;
+  --lt-border: #e8ecea;
+  --lt-text: #182925;
+  --lt-text-muted: #5f6f68;
+}
+
+.theme-light body { background: var(--lt-bg); color: var(--lt-text); }
+.theme-light #root > div { background: var(--lt-bg) !important; color: var(--lt-text) !important; }
+.theme-light #sidebar,
+.theme-light #topbar {
+  background: #ffffff !important;
+  border-color: rgba(32, 52, 48, 0.08) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+.theme-light main { background: var(--lt-bg) !important; color: var(--lt-text); }
+
+.theme-light .card,
+.theme-light .stat-card,
+.theme-light [class*="bg-slate-900"],
+.theme-light [class*="bg-slate-800"],
+.theme-light [class*="bg-slate-700"] {
+  background: #ffffff !important;
+  border-color: rgba(32, 52, 48, 0.09) !important;
+  box-shadow: none !important;
+}
+
+.theme-light .stat-card {
+  background: #ffffff !important;
+  border-color: rgba(32, 52, 48, 0.09) !important;
+  box-shadow: none !important;
+}
+
+.theme-light .btn-secondary,
+.theme-light .input,
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background: var(--lt-panel) !important;
+  color: var(--lt-text) !important;
+  border-color: rgba(148, 163, 152, 0.38) !important;
+}
+.theme-light .btn-secondary:hover { background: #eef5f0 !important; }
+
+.theme-light .btn-primary {
+  background: #047857 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.theme-light .btn-primary:hover {
+  background: #065f46 !important;
+  box-shadow: none !important;
+}
+
+.theme-light .text-white,
+.theme-light [class*="text-slate-100"],
+.theme-light [class*="text-slate-200"],
+.theme-light [class*="text-slate-300"] { color: var(--lt-text) !important; }
+
+.theme-light .login-page .text-white {
+  color: #ffffff !important;
+}
+
+.theme-light .login-page button[class*="bg-emerald-600"],
+.theme-light .login-page button[class*="bg-emerald-700"],
+.theme-light .login-page button[class*="bg-green-600"],
+.theme-light .login-page button[class*="bg-green-700"] {
+  color: #ffffff !important;
+}
+
+.theme-light button.text-white,
+.theme-light a.text-white,
+.theme-light [class*="bg-blue-600"].text-white,
+.theme-light [class*="bg-blue-500"].text-white,
+.theme-light [class*="bg-green-600"].text-white,
+.theme-light [class*="bg-green-500"].text-white,
+.theme-light [class*="bg-emerald-600"].text-white,
+.theme-light [class*="bg-emerald-500"].text-white {
+  color: #ffffff !important;
+}
+
+.theme-light [class*="text-slate-400"],
+.theme-light [class*="text-slate-500"],
+.theme-light [class*="text-slate-600"] { color: var(--lt-text-muted) !important; }
+
+.theme-light [class*="border-slate-700"],
+.theme-light [class*="border-slate-600"],
+.theme-light [class*="border-slate-500"] { border-color: rgba(148, 163, 152, 0.34) !important; }
+
+.theme-light tbody tr:hover { background: rgba(16, 185, 129, 0.1) !important; }
+.theme-light .custom-scroll::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.45); }
+
+/* Light theme skeleton visibility */
+.theme-light .animate-pulse[class*="bg-slate-700"],
+.theme-light .animate-pulse[class*="bg-slate-800"],
+.theme-light .animate-pulse[class*="bg-slate-900"] {
+  background: rgba(32, 52, 48, 0.1) !important;
+}
+
+.theme-light .animate-pulse[class*="bg-slate-700/50"],
+.theme-light .animate-pulse[class*="bg-slate-700/60"],
+.theme-light .animate-pulse[class*="bg-slate-700/70"],
+.theme-light .animate-pulse[class*="bg-slate-800/50"],
+.theme-light .animate-pulse[class*="bg-slate-800/60"],
+.theme-light .animate-pulse[class*="bg-slate-800/70"] {
+  background: rgba(32, 52, 48, 0.12) !important;
+}
+
+/* Light theme sidebar: only active menu has background */
+.theme-light #sidebar nav > div:first-child {
+  color: #708375 !important;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.theme-light #sidebar nav a,
+.theme-light #sidebar nav button {
+  background: transparent !important;
+  color: #6c7b72 !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  transition-property: background-color, color, box-shadow !important;
+}
+
+.theme-light #sidebar nav a:hover,
+.theme-light #sidebar nav button:hover {
+  background: rgba(16, 185, 129, 0.05) !important;
+  color: #325244 !important;
+}
+
+.theme-light #sidebar nav a[class*="bg-blue-500"],
+.theme-light #sidebar nav button[class*="bg-blue-500"] {
+  background: linear-gradient(180deg, rgba(217, 246, 231, 0.92) 0%, rgba(207, 243, 225, 0.88) 100%) !important;
+  color: #047857 !important;
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.55) !important;
+}
+
+.theme-light #sidebar nav a svg,
+.theme-light #sidebar nav button svg {
+  color: #7b8d82 !important;
+}
+
+.theme-light #sidebar nav a[class*="bg-blue-500"] svg,
+.theme-light #sidebar nav button[class*="bg-blue-500"] svg {
+  color: #059669 !important;
+  background-color: transparent !important;
+}
+
+.theme-light #sidebar nav a[class*="bg-blue-500"] .bg-blue-400,
+.theme-light #sidebar nav button[class*="bg-blue-500"] .bg-blue-400 {
+  background-color: #047857 !important;
+}
+
+.theme-light #sidebar nav .pl-4 a {
+  border-radius: 0.8rem !important;
+  color: #6c7b72 !important;
+}
+
+.theme-light #sidebar nav .pl-4 a:hover {
+  background: rgba(16, 185, 129, 0.05) !important;
+  color: #325244 !important;
+}
+
+.theme-light #sidebar nav .pl-4 a[class*="bg-blue-500"] {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: #047857 !important;
+  box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.45) !important;
+}
+
+/* Keep sidebar theme switches from animating layout or border thickness */
+#sidebar {
+  transition-property: width, background-color, border-color !important;
+}
+
+#sidebar nav a,
+#sidebar nav button,
+#sidebar > div:last-child > div,
+#sidebar > div:last-child > button {
+  transition-property: background-color, color, box-shadow !important;
+}
+
+.theme-light #sidebar > div:first-child {
+  border-color: rgba(32, 52, 48, 0.08) !important;
+}
+
+.theme-light #sidebar > div:first-child .bg-gradient-to-br {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.theme-light #sidebar > div:first-child .text-white,
+.theme-light #sidebar > div:first-child [class*="text-slate-400"] {
+  color: var(--lt-text) !important;
+}
+
+.theme-light #sidebar > div:last-child {
+  background: transparent !important;
+  border-color: rgba(32, 52, 48, 0.08) !important;
+}
+
+.theme-light #sidebar > div:last-child > div,
+.theme-light #sidebar > div:last-child > div:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.theme-light #sidebar > div:last-child .text-white,
+.theme-light #sidebar > div:last-child [class*="text-slate-400"],
+.theme-light #sidebar > div:last-child [class*="text-slate-500"] {
+  color: var(--lt-text) !important;
+}
+
+.theme-light #sidebar > div:last-child .bg-gradient-to-br {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #047857 !important;
+  box-shadow: none !important;
+}
+
+/* Global blue -> green remap for admin pages (without changing component structure/logic) */
+.admin-ui-root [class*="text-blue-"],
+body > [class*="fixed"] [class*="text-blue-"],
+.swal2-popup [class*="text-blue-"] { color: #34d399 !important; }
+.admin-ui-root [class*="text-cyan-"],
+body > [class*="fixed"] [class*="text-cyan-"],
+.swal2-popup [class*="text-cyan-"] { color: #6ee7b7 !important; }
+.admin-ui-root [class*="border-blue-"],
+body > [class*="fixed"] [class*="border-blue-"],
+.swal2-popup [class*="border-blue-"] { border-color: rgba(16, 185, 129, 0.45) !important; }
+.admin-ui-root [class*="ring-blue-"],
+body > [class*="fixed"] [class*="ring-blue-"],
+.swal2-popup [class*="ring-blue-"] { --tw-ring-color: rgba(16, 185, 129, 0.45) !important; }
+.admin-ui-root [class*="bg-blue-500/"],
+body > [class*="fixed"] [class*="bg-blue-500/"],
+.swal2-popup [class*="bg-blue-500/"] { background-color: rgba(16, 185, 129, 0.18) !important; }
+.admin-ui-root [class*="bg-blue-700"],
+body > [class*="fixed"] [class*="bg-blue-700"],
+.swal2-popup [class*="bg-blue-700"] { background-color: #065f46 !important; }
+.admin-ui-root [class*="bg-blue-600"],
+body > [class*="fixed"] [class*="bg-blue-600"],
+.swal2-popup [class*="bg-blue-600"] { background-color: #047857 !important; }
+.admin-ui-root [class*="bg-blue-500"]:not([class*="/"]),
+body > [class*="fixed"] [class*="bg-blue-500"]:not([class*="/"]),
+.swal2-popup [class*="bg-blue-500"]:not([class*="/"]) { background-color: #059669 !important; }
+.admin-ui-root button[class*="bg-blue-700"],
+.admin-ui-root button[class*="bg-blue-600"],
+.admin-ui-root button[class*="bg-blue-500"]:not([class*="/"]),
+.admin-ui-root a[class*="bg-blue-700"],
+.admin-ui-root a[class*="bg-blue-600"],
+.admin-ui-root a[class*="bg-blue-500"]:not([class*="/"]),
+body > [class*="fixed"] button[class*="bg-blue-700"],
+body > [class*="fixed"] button[class*="bg-blue-600"],
+body > [class*="fixed"] button[class*="bg-blue-500"]:not([class*="/"]),
+body > [class*="fixed"] a[class*="bg-blue-700"],
+body > [class*="fixed"] a[class*="bg-blue-600"],
+body > [class*="fixed"] a[class*="bg-blue-500"]:not([class*="/"]),
+.swal2-popup button[class*="bg-blue-700"],
+.swal2-popup button[class*="bg-blue-600"],
+.swal2-popup button[class*="bg-blue-500"]:not([class*="/"]) {
+  color: #ffffff !important;
+}
+.admin-ui-root [class*="hover:bg-blue-500/"]:hover,
+body > [class*="fixed"] [class*="hover:bg-blue-500/"]:hover,
+.swal2-popup [class*="hover:bg-blue-500/"]:hover { background-color: rgba(16, 185, 129, 0.26) !important; }
+.admin-ui-root [class*="hover:bg-blue-700"]:hover,
+body > [class*="fixed"] [class*="hover:bg-blue-700"]:hover,
+.swal2-popup [class*="hover:bg-blue-700"]:hover { background-color: #064e3b !important; }
+.admin-ui-root [class*="hover:bg-blue-600"]:hover,
+body > [class*="fixed"] [class*="hover:bg-blue-600"]:hover,
+.swal2-popup [class*="hover:bg-blue-600"]:hover { background-color: #065f46 !important; }
+.admin-ui-root [class*="hover:bg-blue-500"]:hover,
+body > [class*="fixed"] [class*="hover:bg-blue-500"]:hover,
+.swal2-popup [class*="hover:bg-blue-500"]:hover { background-color: #047857 !important; }
+.admin-ui-root [class*="hover:text-blue-"]:hover,
+body > [class*="fixed"] [class*="hover:text-blue-"]:hover,
+.swal2-popup [class*="hover:text-blue-"]:hover { color: #34d399 !important; }
+.admin-ui-root [class*="focus:border-blue-"]:focus,
+body > [class*="fixed"] [class*="focus:border-blue-"]:focus,
+.swal2-popup [class*="focus:border-blue-"]:focus { border-color: #10b981 !important; }
+.admin-ui-root [class*="from-blue-"],
+body > [class*="fixed"] [class*="from-blue-"],
+.swal2-popup [class*="from-blue-"] { --tw-gradient-from: rgba(16, 185, 129, 0.28) var(--tw-gradient-from-position) !important; }
+.admin-ui-root [class*="to-blue-"],
+body > [class*="fixed"] [class*="to-blue-"],
+.swal2-popup [class*="to-blue-"] { --tw-gradient-to: rgba(5, 150, 105, 0.08) var(--tw-gradient-to-position) !important; }
+.admin-ui-root [class*="shadow-blue-"],
+body > [class*="fixed"] [class*="shadow-blue-"],
+.swal2-popup [class*="shadow-blue-"] { --tw-shadow-color: rgba(16, 185, 129, 0.28) !important; --tw-shadow: var(--tw-shadow-colored) !important; }
+
+.theme-light .admin-ui-root [class*="bg-blue-500/"],
+.theme-light .admin-ui-root [class*="bg-green-500/"],
+.theme-light .admin-ui-root [class*="bg-emerald-500/"],
+.theme-light .admin-ui-root [class*="bg-yellow-500/"],
+.theme-light .admin-ui-root [class*="bg-orange-500/"] {
+  color: #203430 !important;
+}
+
+/* Responsive admin layout without changing page structure */
+@media (max-width: 1279px) {
+  :root {
+    --admin-ui-scale: 1.02;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --admin-ui-scale: 0.96;
+    --admin-header-height: calc(64px * var(--admin-ui-scale));
+  }
+
+  html {
+    font-size: calc(15px * var(--admin-ui-scale));
+  }
+
+  .admin-topbar {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+    gap: 0.75rem;
+  }
+
+  .admin-sidebar {
+    width: min(82vw, 20rem) !important;
+    max-width: 20rem;
+    backdrop-filter: blur(10px);
+  }
+
+  .admin-ui-root main > div {
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --admin-ui-scale: 0.9;
+    --admin-header-height: calc(60px * var(--admin-ui-scale));
+  }
+
+  html {
+    font-size: calc(14px * var(--admin-ui-scale));
+  }
+
+  .admin-ui-root main {
+    padding: 0.9rem;
+  }
+
+  .admin-ui-root main > div {
+    padding: 0.75rem !important;
+  }
+
+  .admin-ui-root .card,
+  .admin-ui-root .stat-card {
+    border-radius: 10px;
+  }
+}
+
+.admin-ui-root * {
+  min-width: 0;
+}
+
+.admin-ui-root .overflow-x-auto,
+.admin-ui-root .hide-scrollbar {
+  max-width: 100%;
+}
