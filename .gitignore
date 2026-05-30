@@ -4,9 +4,9 @@
 .env.*.local
 
 # Backups
-backups/mysql/*.sql
-backups/mysql/*.tar.gz
-!backups/mysql/.gitkeep
+# backups/mysql/*.sql
+# backups/mysql/*.tar.gz
+# !backups/mysql/.gitkeep
 
 # Node modules
 node_modules/
