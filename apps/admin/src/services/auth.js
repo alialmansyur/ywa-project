@@ -5,6 +5,35 @@ function emitAuthChanged() {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
 }
 
+export function mapMeResponse(raw) {
+  const roles = Array.isArray(raw?.roles)
+    ? raw.roles.map((role) => {
+        if (typeof role === 'string') return role
+        return role?.name || ''
+      }).filter(Boolean)
+    : []
+
+  const permissions = Array.isArray(raw?.permissions)
+    ? raw.permissions.map((permission) => {
+        if (typeof permission === 'string') return permission
+        return permission?.name || ''
+      }).filter(Boolean)
+    : []
+
+  return {
+    id: raw?.id ?? null,
+    name: raw?.name || '',
+    email: raw?.email || '',
+    phone: raw?.phone || '',
+    avatar: raw?.avatar || null,
+    avatar_url: raw?.avatar_url || null,
+    duty_location: raw?.duty_location || null,
+    is_active: Boolean(raw?.is_active),
+    roles,
+    permissions,
+  }
+}
+
 export function getAuthSession() {
   const raw = localStorage.getItem(AUTH_STORAGE_KEY)
   if (!raw) return null

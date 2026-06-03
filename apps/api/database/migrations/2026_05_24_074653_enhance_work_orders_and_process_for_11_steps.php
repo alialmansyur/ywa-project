@@ -12,12 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         // Update ENUM for work_orders status safely using raw SQL
-        \Illuminate\Support\Facades\DB::statement("
-            ALTER TABLE work_orders 
-            MODIFY COLUMN status ENUM(
-                'draft', 'registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled'
-            ) DEFAULT 'draft'
-        ");
+        if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+            \Illuminate\Support\Facades\DB::statement("
+                ALTER TABLE work_orders 
+                MODIFY COLUMN status ENUM(
+                    'draft', 'registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled'
+                ) DEFAULT 'draft'
+            ");
+        }
 
         Schema::create('wo_process_step_downtimes', function (Blueprint $table) {
             $table->id();
@@ -40,11 +42,13 @@ return new class extends Migration
         Schema::dropIfExists('wo_process_step_downtimes');
 
         // Rollback ENUM status
-        \Illuminate\Support\Facades\DB::statement("
-            ALTER TABLE work_orders 
-            MODIFY COLUMN status ENUM(
-                'draft', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled'
-            ) DEFAULT 'draft'
-        ");
+        if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+            \Illuminate\Support\Facades\DB::statement("
+                ALTER TABLE work_orders 
+                MODIFY COLUMN status ENUM(
+                    'draft', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled'
+                ) DEFAULT 'draft'
+            ");
+        }
     }
 };

@@ -1,2 +1,2 @@
-export { default } from '../schedule';
+export { default } from '../../screens/routes/tabs/schedule/ScheduleScreen';
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../services/api'
+import { resolveAdminNotificationRoute } from '../utils/notificationRoutes'
 import Swal from 'sweetalert2'
 
 const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
@@ -99,7 +100,7 @@ export function Topbar({ title, onToggleSidebar }) {
       confirmButtonText: 'Tutup',
     })
     await removeNotification(notif.id)
-    const route = notif?.data?.admin_route || '/work-orders'
+    const route = resolveAdminNotificationRoute(notif?.data)
     setOpenNotif(false)
     navigate(route)
   }

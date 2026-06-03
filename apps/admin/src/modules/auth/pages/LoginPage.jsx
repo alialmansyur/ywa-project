@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest, ApiError } from '../../../services/api'
-import { saveAuthSession } from '../../../services/auth'
+import { mapMeResponse, saveAuthSession } from '../../../services/auth'
 import { PlatformBadge } from '../../shared/components/PlatformBadge'
 
 const spinnerStyle = {
@@ -45,7 +45,7 @@ export function LoginPage() {
       saveAuthSession({
         token: normalizedToken,
         tokenType: response.token_type || 'Bearer',
-        user: response.user || null,
+        user: mapMeResponse(response.user || null),
       })
 
       navigate('/dashboard', { replace: true })

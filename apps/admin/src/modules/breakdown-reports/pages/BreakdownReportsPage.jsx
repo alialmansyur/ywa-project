@@ -29,6 +29,31 @@ function StatusBadge({ status }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs border ${cls}`}>{status?.toUpperCase() || 'UNKNOWN'}</span>
 }
 
+function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function buildDoneDescription(report, notes) {
+  const feedback = notes.trim()
+  if (!feedback) return report?.description || ''
+
+  const baseDescription = String(report?.description || '')
+  const marker = '\n\n[FEEDBACK] '
+  const previousFeedbackIndex = baseDescription.indexOf(marker)
+  const cleanBase = previousFeedbackIndex >= 0 ? baseDescription.slice(0, previousFeedbackIndex) : baseDescription
+
+  return `${cleanBase}${marker}${feedback}`.slice(0, 5000)
+}
+
 export function BreakdownReportsPage() {
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(false)
@@ -101,15 +126,15 @@ export function BreakdownReportsPage() {
         await apiRequest(`/breakdown-reports/${selectedReport.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'done', description: `${selectedReport.description || ''}${processNotes?.trim() ? `\n\n[FEEDBACK] ${processNotes.trim()}` : ''}`.slice(0, 5000) }),
+          body: JSON.stringify({
+            status: 'done',
+            location_label: selectedReport.location_label || null,
+            description: buildDoneDescription(selectedReport, processNotes),
+          }),
         })
         await swal.fire({ icon: 'success', title: 'Berhasil', text: 'Feedback disimpan dan status laporan diubah ke DONE.' })
       } else {
-        await apiRequest(`/breakdown-reports/${selectedReport.id}/process`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: processNotes }),
-        })
+        await apiRequest(`/breakdown-reports/${selectedReport.id}/process`, { method: 'POST' })
         await swal.fire({ icon: 'success', title: 'Berhasil', text: 'Laporan breakdown diproses menjadi Work Order.' })
       }
       
@@ -215,21 +240,22 @@ export function BreakdownReportsPage() {
                       <div className="text-xs text-slate-400">{r.asset?.name || '-'}</div>
                     </td>
                     <td className="py-3 px-4 text-slate-300 max-w-xs">
-                      <div className="truncate font-medium">{r.location || '-'}</div>
+                      <div className="truncate font-medium">{r.location_label || '-'}</div>
                       <div className="truncate text-xs text-slate-400" title={r.description}>{r.description}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="text-slate-200">{r.reported_by?.name || '-'}</div>
+                      <div className="text-slate-200">{r.reporter?.name || '-'}</div>
+                      <div className="text-xs text-slate-500 mt-1">{r.report_no || `BDR-${r.id}`}</div>
                     </td>
-                    <td className="py-3 px-4 text-slate-300">{r.breakdown_time ? new Date(r.breakdown_time).toLocaleString() : '-'}</td>
+                    <td className="py-3 px-4 text-slate-300">{formatDateTime(r.created_at)}</td>
                     <td className="py-3 px-4"><StatusBadge status={r.status} /></td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2 justify-end">
                         {(r.status === 'submitted' || r.status === 'in_review' || r.status === 'processed') && (
                           <button type="button" onClick={() => openProcessModal(r)} className="px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 text-xs font-medium">Tindak Lanjut</button>
                         )}
-                        {r.status === 'processed' && r.work_order_id && (
-                          <span className="text-xs text-slate-400 px-2 py-1">WO #{r.work_order_id}</span>
+                        {r.status === 'processed' && r.work_order?.id && (
+                          <span className="text-xs text-slate-400 px-2 py-1">{r.work_order?.code || `WO #${r.work_order.id}`}</span>
                         )}
                       </div>
                     </td>
@@ -258,7 +284,13 @@ export function BreakdownReportsPage() {
               <div className="space-y-4">
                 <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
                   <div className="text-xs text-slate-500">Aset: <span className="text-slate-300">{selectedReport.asset?.code} - {selectedReport.asset?.name}</span></div>
+                  <div className="text-xs text-slate-500 mt-1">Pelapor: <span className="text-slate-300">{selectedReport.reporter?.name || '-'}</span></div>
+                  <div className="text-xs text-slate-500 mt-1">Waktu: <span className="text-slate-300">{formatDateTime(selectedReport.created_at)}</span></div>
+                  <div className="text-xs text-slate-500 mt-1">Lokasi: <span className="text-slate-300">{selectedReport.location_label || '-'}</span></div>
                   <div className="text-xs text-slate-500 mt-1">Laporan: <span className="text-slate-300">{selectedReport.description}</span></div>
+                  {selectedReport.work_order?.id ? (
+                    <div className="text-xs text-slate-500 mt-1">Work Order: <span className="text-slate-300">{selectedReport.work_order?.code || `WO #${selectedReport.work_order.id}`}</span></div>
+                  ) : null}
                 </div>
                 <label className="block">
                   <span className="text-xs text-slate-300 mb-1 block">Tindakan</span>
@@ -267,16 +299,20 @@ export function BreakdownReportsPage() {
                     <option value="done">Ubah Status ke DONE</option>
                   </select>
                 </label>
-                <label className="block">
-                  <span className="text-xs text-slate-300 mb-1 block">Feedback {actionType === 'done' ? '(Wajib)' : '(Opsional)'}</span>
-                  <textarea
-                    rows={3}
-                    className="input w-full px-3 py-2 rounded-xl text-sm"
-                    value={processNotes}
-                    onChange={(e) => setProcessNotes(e.target.value)}
-                    placeholder="Tambahkan feedback tindak lanjut..."
-                  />
-                </label>
+                {actionType === 'done' ? (
+                  <label className="block">
+                    <span className="text-xs text-slate-300 mb-1 block">Feedback (Wajib)</span>
+                    <textarea
+                      rows={3}
+                      className="input w-full px-3 py-2 rounded-xl text-sm"
+                      value={processNotes}
+                      onChange={(e) => setProcessNotes(e.target.value)}
+                      placeholder="Tambahkan feedback tindak lanjut..."
+                    />
+                  </label>
+                ) : (
+                  <div className="text-xs text-slate-500">Tindakan process akan langsung membuat Work Order dari laporan ini.</div>
+                )}
               </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button type="button" onClick={() => setProcessModal(false)} disabled={actionLoading} className="px-4 py-2 rounded-xl border border-slate-600 text-slate-300 text-sm">Batal</button>

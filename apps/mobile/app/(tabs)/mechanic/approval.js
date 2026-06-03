@@ -1,2 +1,1 @@
-export { default } from '../../mechanic/approval';
-
+export { default } from '../../../screens/routes/tabs/mechanic/MechanicApprovalScreen';

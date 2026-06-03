@@ -1,2 +1,2 @@
-export { default } from '../preventive';
+export { default } from '../../screens/routes/tabs/preventive/PreventiveScreen';
 

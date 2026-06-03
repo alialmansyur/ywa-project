@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import Swal from 'sweetalert2'
 import { apiRequest, ApiError } from '../../../services/api'
+import { mapMeResponse } from '../../../services/auth'
 import { ModalPortal } from '../../shared/components/ModalPortal'
 
 const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
@@ -143,7 +144,7 @@ export function WorkOrdersPage() {
 
   useEffect(() => {
     apiRequest('/auth/me')
-      .then((me) => setPermissions(me?.permissions || []))
+      .then((me) => setPermissions(mapMeResponse(me)?.permissions || []))
       .catch(() => setPermissions([]))
   }, [])
 

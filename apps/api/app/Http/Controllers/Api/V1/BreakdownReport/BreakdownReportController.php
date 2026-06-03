@@ -19,7 +19,7 @@ class BreakdownReportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = BreakdownReport::query()->with(['asset:id,name,code', 'workOrder:id,code,status']);
+        $query = BreakdownReport::query()->with(['asset:id,name,code', 'workOrder:id,code,status', 'reporter:id,name']);
 
         if ($request->has('mine') && $request->boolean('mine')) {
             $query->where('reporter_id', $request->user()->id);
@@ -32,12 +32,16 @@ class BreakdownReportController extends Controller
             $query->where('status', $request->string('status'));
         }
         if ($request->filled('search')) {
-            $query->whereHas('asset', function($q) use ($request) {
-                $q->where('code', 'like', "%{$request->search}%")
-                  ->orWhere('name', 'like', "%{$request->search}%")
-                  ->orWhere('police_number', 'like', "%{$request->search}%");
-            })->orWhere('description', 'like', "%{$request->search}%")
-              ->orWhere('location_label', 'like', "%{$request->search}%");
+            $search = (string) $request->search;
+            $query->where(function ($scoped) use ($search) {
+                $scoped->whereHas('asset', function ($assetQuery) use ($search) {
+                    $assetQuery->where('code', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('plate_number', 'like', "%{$search}%")
+                        ->orWhere('veh_plate_no', 'like', "%{$search}%");
+                })->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('location_label', 'like', "%{$search}%");
+            });
         }
         if ($request->filled('from')) {
             $query->whereDate('created_at', '>=', $request->from);
@@ -91,13 +95,24 @@ class BreakdownReportController extends Controller
         NotificationDispatcherService::dispatchToAdmins(
             'Laporan Breakdown Baru',
             'Laporan ' . $report->report_no . ' menunggu tindak lanjut.',
-            [
+            NotificationDispatcherService::buildRouteTargetPayload([
                 'route' => '/breakdown-reports',
                 'entity_type' => 'breakdown_report',
                 'entity_id' => $report->id,
                 'report_no' => $report->report_no,
                 'asset_id' => $report->asset_id,
-            ],
+            ], [
+                'mobile' => [
+                    'route_name' => 'report.index',
+                    'route' => '/(tabs)/report',
+                    'params' => ['report_id' => (string) $report->id],
+                ],
+                'admin' => [
+                    'route_name' => 'breakdown-reports.index',
+                    'route' => '/breakdown-reports',
+                    'params' => ['report_id' => (string) $report->id],
+                ],
+            ], '/breakdown-reports', '/breakdown-reports'),
             'breakdown_event'
         );
 
@@ -141,12 +156,22 @@ class BreakdownReportController extends Controller
                 (int) $breakdownReport->reporter_id,
                 'Laporan Breakdown Ditanggapi',
                 'Laporan ' . $breakdownReport->report_no . ' telah mendapatkan feedback.',
-                [
-                    'route' => '/report',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'breakdown_report',
                     'entity_id' => $breakdownReport->id,
                     'status' => $validated['status'],
-                ],
+                ], [
+                    'mobile' => [
+                        'route_name' => 'report.index',
+                        'route' => '/(tabs)/report',
+                        'params' => ['report_id' => (string) $breakdownReport->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'breakdown-reports.index',
+                        'route' => '/breakdown-reports',
+                        'params' => ['report_id' => (string) $breakdownReport->id],
+                    ],
+                ], '/report', '/breakdown-reports'),
                 'breakdown_event'
             );
         }
@@ -168,10 +193,21 @@ class BreakdownReportController extends Controller
 
     public function process(Request $request, BreakdownReport $breakdownReport, WorkOrderController $workOrderController): JsonResponse
     {
-        $response = $workOrderController->breakdown(new Request([
+        $breakdownRequest = $request->duplicate(
+            [],
+            [
+                'asset_id' => $breakdownReport->asset_id,
+                'description' => $breakdownReport->description,
+            ]
+        );
+        $breakdownRequest->replace([
             'asset_id' => $breakdownReport->asset_id,
             'description' => $breakdownReport->description,
-        ]));
+        ]);
+        $breakdownRequest->setUserResolver(fn () => $request->user());
+        $breakdownRequest->attributes->add($request->attributes->all());
+
+        $response = $workOrderController->breakdown($breakdownRequest);
 
         $payload = $response->getData(true);
         $workOrderId = $payload['work_order']['id'] ?? null;

@@ -1,2 +1,2 @@
-export { default } from '../../mechanic/completed-detail';
+export { default } from '../../../screens/routes/tabs/mechanic/MechanicCompletedDetailScreen';
 

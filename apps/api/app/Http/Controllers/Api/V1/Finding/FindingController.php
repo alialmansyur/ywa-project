@@ -158,13 +158,23 @@ class FindingController extends Controller
         NotificationDispatcherService::dispatchToAdmins(
             'Temuan Baru Masuk',
             'Temuan ' . $finding->code . ' menunggu tindak lanjut.',
-            [
-                'route' => '/findings',
+            NotificationDispatcherService::buildRouteTargetPayload([
                 'entity_type' => 'finding',
                 'entity_id' => $finding->id,
                 'code' => $finding->code,
                 'asset_id' => $finding->asset_id,
-            ],
+            ], [
+                'mobile' => [
+                    'route_name' => 'findings.index',
+                    'route' => '/(tabs)/findings',
+                    'params' => ['finding_id' => (string) $finding->id],
+                ],
+                'admin' => [
+                    'route_name' => 'findings.index',
+                    'route' => '/findings',
+                    'params' => ['finding_id' => (string) $finding->id],
+                ],
+            ], '/findings', '/findings'),
             'finding_event'
         );
 
@@ -210,12 +220,22 @@ class FindingController extends Controller
                 (int) $finding->reporter_id,
                 'Temuan Ditanggapi',
                 'Temuan ' . $finding->code . ' telah mendapatkan feedback.',
-                [
-                    'route' => '/findings',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'finding',
                     'entity_id' => $finding->id,
                     'status' => 'resolved',
-                ],
+                ], [
+                    'mobile' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/(tabs)/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                ], '/findings', '/findings'),
                 'finding_event'
             );
         }

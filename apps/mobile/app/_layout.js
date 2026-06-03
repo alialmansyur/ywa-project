@@ -1,13 +1,12 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { AlertProvider } from '../contexts/AlertContext';
-import { HeaderBackButton, HeaderRightSpacer } from '../components/common/HeaderBackButton';
 import { AppHeader } from '../components/common/AppHeader';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { resolveMobileNotificationRoute } from '../utils/notificationRoutes';
 
 const queryClient = new QueryClient();
 
@@ -16,7 +15,7 @@ function RootNavigation() {
 
   useEffect(() => {
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const route = response.notification.request.content.data?.route;
+      const route = resolveMobileNotificationRoute(response.notification.request.content.data);
       if (typeof route === 'string' && route.trim() !== '') {
         router.push(route);
       }
@@ -37,6 +36,7 @@ function RootNavigation() {
     >
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(utility)" options={{ headerShown: false }} />
     </Stack>
   );
 }

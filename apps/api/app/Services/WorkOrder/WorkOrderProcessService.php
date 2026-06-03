@@ -214,7 +214,7 @@ class WorkOrderProcessService
                     }
                 }
 
-                if ($step->step_code === 'PART_SUPPLY') {
+                if ($this->shouldReservePartsForStep($instance, $step->step_code, $partItems)) {
                     $this->reservePartsForWorkOrder($workOrder, $actor, $partItems);
                 }
 
@@ -571,7 +571,7 @@ class WorkOrderProcessService
         foreach ($partItems as $item) {
             $partId = (int) ($item['part_id'] ?? 0);
             $qty = (float) ($item['qty'] ?? 1);
-            $location = (string) ($item['location'] ?? 'gudang-utama');
+            $location = $this->normalizeInventoryLocation((string) ($item['location'] ?? 'gudang-utama'));
 
             if ($partId <= 0 || $qty <= 0) {
                 $this->reportAbnormality($workOrder, [
@@ -628,6 +628,29 @@ class WorkOrderProcessService
                 'notes' => 'Reservasi part dari PART_SUPPLY',
             ]);
         }
+    }
+
+    private function shouldReservePartsForStep(WoProcessInstance $instance, string $stepCode, array $partItems): bool
+    {
+        if ($stepCode === 'PART_SUPPLY') {
+            return true;
+        }
+
+        if ($stepCode !== 'REPAIR' || empty($partItems)) {
+            return false;
+        }
+
+        $templateCode = strtoupper((string) optional($instance->template)->code);
+
+        return str_starts_with($templateCode, 'WO-WORKSHOP-BAY-');
+    }
+
+    private function normalizeInventoryLocation(string $location): string
+    {
+        return match (strtolower(trim($location))) {
+            '', 'main' => 'gudang-utama',
+            default => trim($location),
+        };
     }
 
     private function reportAbnormality(WorkOrder $workOrder, array $payload): void

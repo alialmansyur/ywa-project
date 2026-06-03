@@ -2,6 +2,7 @@
 
 namespace App\Services\Approval;
 
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Support\Facades\DB;
 
 class ApprovalWorkflowService
@@ -91,12 +92,23 @@ class ApprovalWorkflowService
                             'type' => 'approval_request',
                             'title' => 'Permintaan Approval Baru',
                             'body' => "Terdapat permintaan approval {$template->name} yang membutuhkan review Anda.",
-                            'data' => [
+                            'data' => NotificationDispatcherService::buildRouteTargetPayload([
                                 'approval_request_id' => $requestId,
                                 'route_key' => $template->route_key,
                                 'reference_type' => $referenceType,
                                 'reference_id' => $referenceId,
-                            ],
+                            ], [
+                                'mobile' => [
+                                    'route_name' => 'notifications.index',
+                                    'route' => '/notifications',
+                                    'params' => ['approval_request_id' => (string) $requestId],
+                                ],
+                                'admin' => [
+                                    'route_name' => 'approvals.inbox',
+                                    'route' => '/approvals/inbox',
+                                    'params' => ['approval_request_id' => (string) $requestId],
+                                ],
+                            ], '/notifications', '/approvals/inbox'),
                             'is_read' => false,
                         ]);
 

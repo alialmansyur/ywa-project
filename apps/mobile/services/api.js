@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { create } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { API_CONFIG } from '../constants/config';
 
@@ -43,7 +43,7 @@ const normalizeApiError = (error) => {
   };
 };
 
-const apiClient = axios.create({
+const apiClient = create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
   headers: {

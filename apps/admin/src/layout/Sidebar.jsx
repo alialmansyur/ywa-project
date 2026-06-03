@@ -1,7 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { NAV_ITEMS } from '../types/navigation'
-import { clearAuthSession, getAuthSession } from '../services/auth'
+import { clearAuthSession, getAuthSession, mapMeResponse } from '../services/auth'
 import { apiRequest, ApiError } from '../services/api'
 
 function toRoleLabel(input) {
@@ -30,8 +30,8 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
   const [logoError, setLogoError] = useState(false)
   const [currentUser, setCurrentUser] = useState(() => {
     const session = getAuthSession()
-    const user = session?.user || {}
-    const roleRaw = user?.role || user?.roles?.[0]?.name || user?.roles?.[0] || ''
+    const user = mapMeResponse(session?.user || {})
+    const roleRaw = user?.roles?.[0] || ''
     return {
       name: user?.name || 'User',
       role: toRoleLabel(roleRaw),
@@ -86,9 +86,9 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
     let active = true
     const loadCurrentUser = async () => {
       try {
-        const me = await apiRequest('/auth/me')
+        const me = mapMeResponse(await apiRequest('/auth/me'))
         if (!active) return
-        const roleRaw = me?.role || me?.roles?.[0]?.name || me?.roles?.[0] || ''
+        const roleRaw = me?.roles?.[0] || ''
         setCurrentUser({
           name: me?.name || 'User',
           role: toRoleLabel(roleRaw),

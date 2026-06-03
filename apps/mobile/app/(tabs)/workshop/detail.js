@@ -1,2 +1,2 @@
-export { default } from '../../workshop/detail';
+export { default } from '../../../screens/routes/tabs/workshop/WorkshopDetailScreen';
 

@@ -1,2 +1,2 @@
-export { default } from '../../mechanic/process';
+export { default } from '../../../screens/routes/tabs/mechanic/MechanicProcessScreen';
 

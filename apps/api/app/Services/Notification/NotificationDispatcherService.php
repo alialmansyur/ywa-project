@@ -11,6 +11,51 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationDispatcherService
 {
+    public static function buildRouteTargetPayload(
+        array $data,
+        array $targets,
+        ?string $legacyRoute = null,
+        ?string $legacyAdminRoute = null
+    ): array {
+        $normalizedTargets = [];
+
+        foreach ($targets as $platform => $target) {
+            if (! is_array($target)) {
+                continue;
+            }
+
+            $route = trim((string) ($target['route'] ?? ''));
+            $routeName = trim((string) ($target['route_name'] ?? ''));
+            $params = is_array($target['params'] ?? null) ? $target['params'] : [];
+
+            if ($route === '' && $routeName === '') {
+                continue;
+            }
+
+            $normalizedTargets[$platform] = [
+                'route_name' => $routeName !== '' ? $routeName : null,
+                'route' => $route !== '' ? $route : null,
+                'params' => $params,
+            ];
+        }
+
+        if ($legacyRoute === null) {
+            $legacyRoute = $normalizedTargets['mobile']['route']
+                ?? $normalizedTargets['web']['route']
+                ?? null;
+        }
+
+        if ($legacyAdminRoute === null) {
+            $legacyAdminRoute = $normalizedTargets['admin']['route'] ?? null;
+        }
+
+        return array_merge($data, [
+            'target' => (object) $normalizedTargets,
+            'route' => $legacyRoute,
+            'admin_route' => $legacyAdminRoute,
+        ]);
+    }
+
     public static function dispatchToAdmins(string $title, string $body, array $data = [], string $type = 'system'): void
     {
         self::dispatchToRoles(['admin', 'superadmin'], $title, $body, $data, $type);
@@ -88,20 +133,29 @@ class NotificationDispatcherService
         [$title, $body] = $this->buildMessage($workOrder, $eventKey, $meta);
         $priority = $this->resolvePriority($eventKey);
 
-        $payload = [
+        $payload = self::buildRouteTargetPayload([
             'event_key' => $eventKey,
             'entity_type' => 'work_order',
             'entity_id' => $workOrder->id,
             'work_order_id' => $workOrder->id,
             'work_order_code' => $workOrder->code,
-            'route' => '/workshop/detail?work_order_id=' . $workOrder->id,
-            'admin_route' => '/work-orders',
             'priority' => $priority,
             'actor_id' => $actor?->id,
             'actor_name' => $actor?->name,
             'occurred_at' => now()->toISOString(),
             'meta' => $meta,
-        ];
+        ], [
+            'mobile' => [
+                'route_name' => 'workshop.detail',
+                'route' => '/(tabs)/workshop/detail',
+                'params' => ['work_order_id' => (string) $workOrder->id],
+            ],
+            'admin' => [
+                'route_name' => 'work-orders.index',
+                'route' => '/work-orders',
+                'params' => ['work_order_id' => (string) $workOrder->id],
+            ],
+        ], '/workshop/detail?work_order_id=' . $workOrder->id, '/work-orders');
 
         $targets = $this->resolveTargets($workOrder, $eventKey, $actor);
 

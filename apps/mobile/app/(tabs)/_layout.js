@@ -1,7 +1,7 @@
 import { Tabs, router } from 'expo-router';
 import { theme } from '../../constants/AppTheme';
 import { Home, ClipboardList, User, AlertTriangle, History, Bell } from 'lucide-react-native';
-import { HeaderBackButton, HeaderRightSpacer } from '../../components/common/HeaderBackButton';
+import { HeaderBackButton } from '../../components/common/HeaderBackButton';
 import { AppHeader } from '../../components/common/AppHeader';
 import { createHeaderIconButton } from '../../utils/header-options';
 import { useAuthStore } from '../../stores/auth.store';
@@ -26,7 +26,7 @@ function NotificationIcon() {
     } else {
       scale.setValue(1);
     }
-  }, [unreadCount]);
+  }, [scale, unreadCount]);
 
   return (
     <View>
@@ -53,7 +53,7 @@ export default function TabLayout() {
         .then(res => setNotifications(res?.notifications?.data || []))
         .catch(() => {});
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setNotifications]);
 
   return (
     <Tabs
@@ -138,14 +138,14 @@ export default function TabLayout() {
       <Tabs.Screen name="schedule" options={{ href: null, title: 'Jadwal & Kalender', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="preventive" options={{ href: null, title: 'Cek Preventive', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="guide" options={{ href: null, title: 'Panduan Operasional', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
-      <Tabs.Screen name="assets" options={{ href: null, title: 'Daftar Aset Unit', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
+      <Tabs.Screen name="unit-assets" options={{ href: null, title: 'Daftar Aset Unit', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="workshop/index" options={{ href: null, title: 'Workshop', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="workshop/detail" options={{ href: null, title: 'Progress Workshop', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="mechanic/index" options={{ href: null, title: 'Workstation Mekanik', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="mechanic/approval" options={{ href: null, title: 'Approval Kedatangan', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="mechanic/process" options={{ href: null, title: 'Station Control', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <Tabs.Screen name="mechanic/completed-detail" options={{ href: null, title: 'Detail Pengerjaan', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
-      <Tabs.Screen name="assets/[id]" options={{ href: null, title: 'Detail Aset', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
+      <Tabs.Screen name="unit-assets/[id]" options={{ href: null, title: 'Detail Aset', headerLeft: () => <HeaderBackButton color="#fff" /> }} />
     </Tabs>
   );
 }

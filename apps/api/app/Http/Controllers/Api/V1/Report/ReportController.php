@@ -486,12 +486,15 @@ class ReportController extends Controller
         ]);
     }
 
-    private function reportPayloadByType(string $type, string $start, string $end): array
+    private function reportPayloadByType(Request $request, string $type, string $start, string $end): array
     {
         $requestObj = Request::create('/api/v1/reports/data', 'GET', [
             'type' => $type,
             'start' => $start,
             'end' => $end,
+            'status' => $request->query('status'),
+            'wo_type' => $request->query('wo_type'),
+            'step_code' => $request->query('step_code'),
         ]);
 
         $response = $this->data($requestObj);
@@ -504,7 +507,7 @@ class ReportController extends Controller
         $start = (string) $request->query('start', now()->startOfMonth()->toDateString());
         $end = (string) $request->query('end', now()->endOfMonth()->toDateString());
 
-        $payload = $this->reportPayloadByType($type, $start, $end);
+        $payload = $this->reportPayloadByType($request, $type, $start, $end);
         $details = $payload['details'] ?? [];
 
         $spreadsheet = new Spreadsheet();

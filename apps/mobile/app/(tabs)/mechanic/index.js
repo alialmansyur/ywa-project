@@ -1,2 +1,2 @@
-export { default } from '../../mechanic/index';
+export { default } from '../../../screens/routes/tabs/mechanic/MechanicQueueScreen';
 

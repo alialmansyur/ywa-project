@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Chart from 'react-apexcharts'
-import { apiRequest } from '../../../services/api'
+import Swal from 'sweetalert2'
+import { getBearerToken } from '../../../services/auth'
+import { API_BASE_URL, apiRequest } from '../../../services/api'
 
 const CONFIG = {
   p2h: { title: 'P2H Compliance', chart: 'rate' },
@@ -18,6 +20,16 @@ const CONFIG = {
 const WO_STATUS_OPTIONS = ['', 'draft', 'registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled']
 const WO_TYPE_OPTIONS = ['', 'preventive', 'corrective', 'breakdown', 'inspection']
 const STEP_OPTIONS = ['', 'REGISTRATION', 'APPROVAL', 'WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER', 'PLANNER_CHECK', 'KRANI_WO_JOBCARD', 'ASST_VERIFY_JOBCARD', 'KOORD_ALLOCATE_MECHANIC', 'UNIT_CHECK_PART_NEED', 'PART_SUPPLY', 'SERVICE_REPAIR', 'QC_CHECK', 'CLOSE_WO']
+
+const swal = Swal.mixin({
+  width: 420,
+  customClass: {
+    popup: 'rounded-2xl',
+    confirmButton: 'rounded-lg',
+    cancelButton: 'rounded-lg',
+  },
+  buttonsStyling: true,
+})
 
 function SkeletonBlock({ className = '' }) {
   return <div className={`animate-pulse rounded-xl bg-slate-700/60 ${className}`} />
@@ -61,6 +73,7 @@ function buildKpis(summary, details = []) {
 export function ReportsPage({ type = 'p2h', title }) {
   const report = CONFIG[type] || CONFIG.p2h
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [data, setData] = useState(null)
   const [generatedAt, setGeneratedAt] = useState('')
 
@@ -114,9 +127,58 @@ export function ReportsPage({ type = 'p2h', title }) {
     return [{ name: title || report.title, data: data.chart.map((c) => c[report.chart] ?? c.count ?? 0) }]
   }, [data, report, title])
 
-  const doExport = () => {
-    const token = localStorage.getItem('token') || ''
-    window.open(`http://localhost:8001/api/v1/reports/export?type=${type}&start=${dateFrom}&end=${dateTo}&token=${token}`, '_blank')
+  const doExport = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ type, start: dateFrom, end: dateTo })
+      if (status) params.set('status', status)
+      if (woType) params.set('wo_type', woType)
+      if (stepCode) params.set('step_code', stepCode)
+
+      const token = getBearerToken()
+      const response = await fetch(`${API_BASE_URL}/reports/export?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ...(token ? { Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}` } : {}),
+        },
+      })
+
+      if (!response.ok) {
+        let message = `Gagal export report (${response.status})`
+        const contentType = response.headers.get('content-type') || ''
+
+        if (contentType.includes('application/json')) {
+          const body = await response.json()
+          if (typeof body?.message === 'string' && body.message) {
+            message = body.message
+          }
+        }
+
+        throw new Error(message)
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('content-disposition') || ''
+      const matchedFileName = contentDisposition.match(/filename="([^"]+)"/i)
+      const fileName = matchedFileName?.[1] || `report_${type}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch (error) {
+      await swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: error instanceof Error ? error.message : 'Gagal export report ke Excel.',
+      })
+    } finally {
+      setExporting(false)
+    }
   }
 
   const showStatusFilter = ['wo', 'wo-history', 'service-history'].includes(type)
@@ -166,7 +228,7 @@ export function ReportsPage({ type = 'p2h', title }) {
         </div>
         <div className="flex gap-2">
           <button onClick={fetchData} disabled={loading} className="btn-primary px-5 py-2.5 rounded-xl text-sm text-white">{loading ? 'Memuat...' : 'Generate Laporan'}</button>
-          <button onClick={doExport} className="btn-secondary px-4 py-2.5 rounded-xl text-sm text-green-400 border-green-500/20">Export Excel</button>
+          <button onClick={doExport} disabled={exporting} className="btn-secondary px-4 py-2.5 rounded-xl text-sm text-green-400 border-green-500/20 disabled:opacity-60">{exporting ? 'Exporting...' : 'Export Excel'}</button>
         </div>
       </div>
 

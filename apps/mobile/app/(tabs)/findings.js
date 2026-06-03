@@ -1,2 +1,2 @@
-export { default } from '../findings';
+export { default } from '../../screens/routes/tabs/findings/FindingsScreen';
 

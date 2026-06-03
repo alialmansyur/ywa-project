@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 import { apiRequest, ApiError } from '../../../services/api'
+import { mapMeResponse } from '../../../services/auth'
 import { SearchableSelect } from '../../shared/components/SearchableSelect'
 
 const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
@@ -75,7 +76,7 @@ export function SchedulePage() {
       apiRequest('/auth/me'),
     ])
     setAssets(assetRes?.data || [])
-    setMe(meRes?.user || null)
+    setMe(mapMeResponse(meRes || null))
   }
 
   const loadCalendar = async (year, month) => {

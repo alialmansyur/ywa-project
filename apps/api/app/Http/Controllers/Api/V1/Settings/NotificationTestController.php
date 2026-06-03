@@ -7,6 +7,7 @@ use App\Jobs\SendPushNotificationJob;
 use App\Models\AppNotification;
 use App\Models\User;
 use App\Models\UserPushToken;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -99,9 +100,11 @@ class NotificationTestController extends Controller
             $users = User::query()->where('is_active', true)->get(['id', 'name', 'fcm_token']);
         }
 
-        $payload = [
+        $route = $validated['route'] ?? '/notifications';
+        $adminRoute = str_starts_with($route, '/(') ? '/settings/notification-test' : $route;
+
+        $payload = NotificationDispatcherService::buildRouteTargetPayload([
             'event_key' => 'MANUAL_TEST_NOTIFICATION',
-            'route' => $validated['route'] ?? '/notifications',
             'priority' => $validated['priority'] ?? 'medium',
             'meta' => [
                 'sent_by' => $request->user()->id,
@@ -109,7 +112,18 @@ class NotificationTestController extends Controller
                 'mode' => $mode,
             ],
             'occurred_at' => now()->toISOString(),
-        ];
+        ], [
+            'mobile' => [
+                'route_name' => 'manual-test',
+                'route' => $route,
+                'params' => [],
+            ],
+            'admin' => [
+                'route_name' => 'manual-test',
+                'route' => $adminRoute,
+                'params' => [],
+            ],
+        ], $route, $adminRoute);
 
         $inAppCount = 0;
         $pushQueued = 0;

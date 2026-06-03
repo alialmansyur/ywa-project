@@ -106,6 +106,17 @@ class WorkOrderController extends Controller
             'description' => 'required|string',
         ]);
 
+        $hasOpenWorkOrder = WorkOrder::query()
+            ->where('asset_id', $validated['asset_id'])
+            ->whereIn('status', ['registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold'])
+            ->exists();
+
+        if ($hasOpenWorkOrder) {
+            return response()->json([
+                'message' => 'Unit ini masih memiliki proses workshop yang belum selesai. Registrasi baru hanya bisa dibuat jika work order sebelumnya sudah selesai.',
+            ], 422);
+        }
+
         $wo = WorkOrder::create([
             'asset_id' => $validated['asset_id'],
             'title' => $validated['title'],

@@ -68,7 +68,16 @@ export const simulateIncomingWO = async () => {
     content: {
       title: "🚨 Darurat: Breakdown PC-200",
       body: "Driver Ahmad melaporkan engine panas di Site A. Segera cek panel mekanik!",
-      data: { route: '/mechanic' },
+      data: {
+        route: '/(tabs)/mechanic',
+        target: {
+          mobile: {
+            route_name: 'mechanic.index',
+            route: '/(tabs)/mechanic',
+            params: {},
+          },
+        },
+      },
       sound: true,
     },
     trigger: null, // Send immediately

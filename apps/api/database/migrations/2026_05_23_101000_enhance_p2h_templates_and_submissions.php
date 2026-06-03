@@ -9,7 +9,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE p2h_templates MODIFY asset_category_id BIGINT UNSIGNED NULL');
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('p2h_templates', function (Blueprint $table) {
+                $table->unsignedBigInteger('asset_category_id')->nullable()->change();
+            });
+        } else {
+            DB::statement('ALTER TABLE p2h_templates MODIFY asset_category_id BIGINT UNSIGNED NULL');
+        }
 
         Schema::table('p2h_templates', function (Blueprint $table) {
             $table->boolean('applies_to_all_assets')->default(false)->after('items');
@@ -54,6 +60,12 @@ return new class extends Migration
             ]);
         });
 
-        DB::statement('ALTER TABLE p2h_templates MODIFY asset_category_id BIGINT UNSIGNED NOT NULL');
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('p2h_templates', function (Blueprint $table) {
+                $table->unsignedBigInteger('asset_category_id')->nullable(false)->change();
+            });
+        } else {
+            DB::statement('ALTER TABLE p2h_templates MODIFY asset_category_id BIGINT UNSIGNED NOT NULL');
+        }
     }
 };

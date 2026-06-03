@@ -4,7 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\Inventory;
+use App\Models\InventoryTransaction;
+use App\Models\SparePart;
 use App\Models\User;
+use App\Models\WoPartsUsage;
 use App\Models\WorkOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,24 +45,159 @@ class WorkOrderProcessFlowTest extends TestCase
             'created_by' => $supervisor->id,
         ]);
 
-        $this->actingAs($user, 'sanctum')
+        $this->actingAsApi($user)
             ->postJson("/api/v1/work-orders/{$workOrder->id}/process/start")
             ->assertOk();
 
-        $process = $this->actingAs($user, 'sanctum')
+        $process = $this->actingAsApi($user)
             ->getJson("/api/v1/work-orders/{$workOrder->id}/process")
             ->assertOk()
             ->json();
 
         $this->assertNotEmpty($process['instances']);
-        $firstStep = $process['instances'][0]['step_logs'][0]['step_order'];
+        $firstReadyStep = collect($process['instances'][0]['step_logs'])->firstWhere('status', 'ready');
+        $this->assertNotNull($firstReadyStep);
+        $firstStep = $firstReadyStep['step_order'];
 
-        $this->actingAs($user, 'sanctum')
+        $this->actingAsApi($user)
             ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$firstStep}/in", ['notes' => 'start'])
             ->assertOk();
 
-        $this->actingAs($user, 'sanctum')
-            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$firstStep}/out", ['downtime_minutes' => 5])
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$firstStep}/out", [
+                'downtime_minutes' => 5,
+                'notes' => 'Langkah pertama selesai.',
+            ])
             ->assertOk();
+    }
+
+    public function test_workshop_bay_repair_step_reserves_parts_and_normalizes_main_location(): void
+    {
+        $this->seed();
+
+        $user = User::where('email', 'mechanic@tapg.local')->firstOrFail();
+        $user->givePermissionTo('execute work-orders');
+
+        $category = AssetCategory::query()->create(['name' => 'Excavator']);
+        $asset = Asset::query()->create([
+            'code' => 'EXC-T-002',
+            'name' => 'Excavator Test 002',
+            'category_id' => $category->id,
+            'status' => 'active',
+        ]);
+
+        $supervisor = User::where('email', 'supervisor@tapg.local')->firstOrFail();
+
+        $workOrder = WorkOrder::query()->create([
+            'code' => 'WO-TEST-REPAIR-001',
+            'asset_id' => $asset->id,
+            'type' => 'preventive',
+            'priority' => 'medium',
+            'title' => 'Service bay spare part test',
+            'status' => 'approved',
+            'supervisor_id' => $supervisor->id,
+            'created_by' => $supervisor->id,
+        ]);
+
+        $sparePart = SparePart::query()->create([
+            'code' => 'SP-001',
+            'name' => 'Filter Oli',
+            'unit' => 'pcs',
+            'min_stock' => 1,
+            'unit_price' => 125000,
+            'is_active' => true,
+        ]);
+
+        $inventory = Inventory::query()->create([
+            'part_id' => $sparePart->id,
+            'location' => 'gudang-utama',
+            'qty_available' => 10,
+        ]);
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/start")
+            ->assertOk();
+
+        $process = $this->actingAsApi($user)
+            ->getJson("/api/v1/work-orders/{$workOrder->id}/process")
+            ->assertOk()
+            ->json();
+
+        $stepLogs = collect($process['instances'][0]['step_logs'] ?? []);
+
+        foreach (['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY'] as $stepCode) {
+            $stepOrder = (int) $stepLogs->firstWhere('step_code', $stepCode)['step_order'];
+
+            $this->actingAsApi($user)
+                ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$stepOrder}/in", ['notes' => "Mulai {$stepCode}"])
+                ->assertOk();
+
+            $this->actingAsApi($user)
+                ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$stepOrder}/out", [
+                    'notes' => "Selesai {$stepCode}",
+                ])
+                ->assertOk();
+        }
+
+        $createWoStepOrder = (int) $stepLogs->firstWhere('step_code', 'CREATE_WO')['step_order'];
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$createWoStepOrder}/in", ['notes' => 'Mulai CREATE_WO'])
+            ->assertOk();
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$createWoStepOrder}/out", [
+                'notes' => 'WO dan jobcard selesai dibuat.',
+                'sap_reference_no' => 'SAP-WO-001',
+            ])
+            ->assertOk();
+
+        $repairStepOrder = (int) $stepLogs->firstWhere('step_code', 'REPAIR')['step_order'];
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$repairStepOrder}/in", ['notes' => 'Mulai REPAIR'])
+            ->assertOk();
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$repairStepOrder}/out", [
+                'notes' => 'Selesai REPAIR dengan ganti filter.',
+                'part_required' => true,
+                'part_items' => [
+                    [
+                        'part_id' => $sparePart->id,
+                        'qty' => 2,
+                        'location' => 'main',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('wo_parts_usage', [
+            'wo_id' => $workOrder->id,
+            'part_id' => $sparePart->id,
+            'qty_requested' => 2,
+            'qty_used' => 2,
+        ]);
+
+        $this->assertDatabaseHas('inventory_transactions', [
+            'part_id' => $sparePart->id,
+            'type' => 'out',
+            'reference_type' => 'work_order',
+            'reference_id' => $workOrder->id,
+            'processed_by' => $user->id,
+        ]);
+
+        $this->assertSame(8.0, (float) $inventory->fresh()->qty_available);
+        $this->assertSame(1, WoPartsUsage::query()->where('wo_id', $workOrder->id)->count());
+        $this->assertSame(1, InventoryTransaction::query()->where('reference_id', $workOrder->id)->count());
+    }
+
+    private function actingAsApi(User $user): self
+    {
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        return $this
+            ->withHeader('Authorization', "Bearer {$token}")
+            ->actingAs($user, 'sanctum');
     }
 }

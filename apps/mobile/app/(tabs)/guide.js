@@ -1,2 +1,2 @@
-export { default } from '../guide';
+export { default } from '../../screens/routes/tabs/guide/GuideScreen';
 

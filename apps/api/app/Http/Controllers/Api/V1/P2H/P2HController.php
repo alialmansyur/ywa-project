@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\P2hSubmission;
 use App\Models\P2hTemplate;
+use App\Services\Notification\NotificationDispatcherService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 /**
  * @tags P2H (Pre-Task Health Check)
@@ -201,10 +204,21 @@ class P2HController extends Controller
                 'type' => 'p2h_submission',
                 'title' => 'Laporan P2H Baru',
                 'body' => "Laporan P2H baru telah disubmit dan menunggu review.",
-                'data' => [
+                'data' => NotificationDispatcherService::buildRouteTargetPayload([
                     'p2h_id' => $submission->id,
                     'asset_id' => $submission->asset_id,
-                ],
+                ], [
+                    'mobile' => [
+                        'route_name' => 'notifications.index',
+                        'route' => '/notifications',
+                        'params' => ['p2h_id' => (string) $submission->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'p2h.index',
+                        'route' => '/p2h',
+                        'params' => ['p2h_id' => (string) $submission->id],
+                    ],
+                ], '/notifications', '/p2h'),
                 'is_read' => false,
             ]);
 
@@ -274,7 +288,11 @@ class P2HController extends Controller
     {
         $validated = $request->validate([
             'status'       => 'required|in:approved,rejected',
-            'review_notes' => 'nullable|string',
+            'review_notes' => [
+                'nullable',
+                'string',
+                Rule::requiredIf(fn () => $request->input('status') === 'rejected'),
+            ],
         ]);
 
         $p2h->update([
@@ -294,11 +312,13 @@ class P2HController extends Controller
     {
         $from = $request->from ?? now()->startOfMonth()->toDateString();
         $to   = $request->to ?? now()->toDateString();
+        $rangeStart = Carbon::parse($from)->startOfDay();
+        $rangeEnd = Carbon::parse($to)->endOfDay();
 
-        $total    = P2hSubmission::whereBetween('created_at', [$from, $to])->count();
-        $approved = P2hSubmission::whereBetween('created_at', [$from, $to])->where('status', 'approved')->count();
-        $rejected = P2hSubmission::whereBetween('created_at', [$from, $to])->where('status', 'rejected')->count();
-        $pending  = P2hSubmission::whereBetween('created_at', [$from, $to])->where('status', 'submitted')->count();
+        $total    = P2hSubmission::whereBetween('created_at', [$rangeStart, $rangeEnd])->count();
+        $approved = P2hSubmission::whereBetween('created_at', [$rangeStart, $rangeEnd])->where('status', 'approved')->count();
+        $rejected = P2hSubmission::whereBetween('created_at', [$rangeStart, $rangeEnd])->where('status', 'rejected')->count();
+        $pending  = P2hSubmission::whereBetween('created_at', [$rangeStart, $rangeEnd])->where('status', 'submitted')->count();
 
         return response()->json([
             'period'           => ['from' => $from, 'to' => $to],

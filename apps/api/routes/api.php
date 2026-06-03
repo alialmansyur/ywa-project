@@ -219,7 +219,7 @@ Route::prefix('v1')->group(function () {
         Route::prefix('inventory')->name('inventory.')->group(function () {
             Route::get('/', [InventoryController::class, 'indexInventory'])->name('index');
             Route::get('transactions', [InventoryController::class, 'indexTransactions'])->name('transactions.index');
-            Route::post('transactions', [InventoryController::class, 'storeTransaction'])->name('transactions')->middleware('approval.template:admin.inventory.transactions.out');
+            Route::post('transactions', [InventoryController::class, 'storeTransaction'])->name('transactions');
         });
 
         Route::prefix('findings')->name('findings.')->group(function () {
