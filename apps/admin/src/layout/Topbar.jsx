@@ -69,23 +69,10 @@ export function Topbar({ title, onToggleSidebar }) {
     }
   }, [])
 
-  const removeNotification = async (id) => {
+  const markAllNotificationsRead = async () => {
     try {
-      const target = notifications.find((n) => String(n.id) === String(id))
-      await apiRequest(`/notifications/${id}`, { method: 'DELETE' })
-      setNotifications((prev) => prev.filter((n) => String(n.id) !== String(id)))
-      if (target && !target.is_read) {
-        setUnreadCount((prev) => Math.max(0, prev - 1))
-      }
-    } catch {
-      // no-op
-    }
-  }
-
-  const removeAllNotifications = async () => {
-    try {
-      await Promise.all(notifications.map((n) => apiRequest(`/notifications/${n.id}`, { method: 'DELETE' })))
-      setNotifications([])
+      await apiRequest('/notifications/read-all', { method: 'PATCH' })
+      setNotifications((prev) => prev.map((item) => ({ ...item, is_read: true })))
       setUnreadCount(0)
     } catch {
       // no-op
@@ -99,7 +86,19 @@ export function Topbar({ title, onToggleSidebar }) {
       text: notif?.body || notif?.message || '-',
       confirmButtonText: 'Tutup',
     })
-    await removeNotification(notif.id)
+    if (!notif?.is_read) {
+      try {
+        await apiRequest(`/notifications/${notif.id}/read`, { method: 'PATCH' })
+        setNotifications((prev) => prev.map((item) => (
+          String(item.id) === String(notif.id)
+            ? { ...item, is_read: true }
+            : item
+        )))
+        setUnreadCount((prev) => Math.max(0, prev - 1))
+      } catch {
+        // no-op
+      }
+    }
     const route = resolveAdminNotificationRoute(notif?.data)
     setOpenNotif(false)
     navigate(route)
@@ -149,7 +148,7 @@ export function Topbar({ title, onToggleSidebar }) {
                 <div className="text-sm font-semibold text-white">Notifikasi</div>
                 <div className="text-xs text-slate-400">{unreadCount} belum dibaca</div>
               </div>
-              <button type="button" onClick={removeAllNotifications} className="text-[11px] text-blue-300 hover:text-blue-200">Baca semua</button>
+              <button type="button" onClick={markAllNotificationsRead} className="text-[11px] text-blue-300 hover:text-blue-200">Baca semua</button>
             </div>
             <div className="max-h-72 overflow-y-auto custom-scroll">
               {notifications.length === 0 ? (

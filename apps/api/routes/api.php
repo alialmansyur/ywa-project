@@ -47,7 +47,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── AUTHENTICATED ROUTES ────────────────────────────────────────────────
-    Route::middleware(['require.bearer', 'auth:sanctum', 'throttle:240,1'])->group(function () {
+    Route::middleware(['require.bearer', 'auth:sanctum', 'throttle:api-authenticated'])->group(function () {
 
         // Auth
         Route::prefix('auth')->name('auth.')->group(function () {

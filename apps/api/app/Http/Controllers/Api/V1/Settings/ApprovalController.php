@@ -14,6 +14,95 @@ class ApprovalController extends Controller
     {
     }
 
+    private function templateRowsResponse($rows): JsonResponse
+    {
+        $payload = $rows->toArray();
+        $payload['items'] = $payload['data'] ?? [];
+
+        return response()->json($payload);
+    }
+
+    private function normalizeReferenceTypeFilter(?string $type): ?array
+    {
+        $raw = trim((string) $type);
+        if ($raw === '') {
+            return null;
+        }
+
+        return match ($raw) {
+            'App\\Models\\P2h',
+            'App\\Models\\P2H',
+            'App\\Models\\P2hSubmission' => ['App\\Models\\P2hSubmission'],
+            default => [$raw],
+        };
+    }
+
+    private function normalizeInboxRow(object $row): array
+    {
+        $referenceType = (string) ($row->reference_type ?? '');
+        $requesterName = $row->submitted_by_name ?? null;
+        $currentStepName = $row->step_name ?? null;
+
+        return [
+            'approval_request_id' => $row->approval_request_id,
+            'id' => $row->approval_request_id,
+            'route_key' => $row->route_key,
+            'reference_type' => $referenceType,
+            'reference_type_label' => str_contains($referenceType, '\\')
+                ? class_basename($referenceType)
+                : $referenceType,
+            'reference_id' => $row->reference_id,
+            'submitted_at' => $row->submitted_at,
+            'created_at' => $row->submitted_at,
+            'step_order' => $row->step_order,
+            'step_name' => $currentStepName,
+            'current_step_name' => $currentStepName,
+            'current_step' => [
+                'name' => $currentStepName,
+                'order' => $row->step_order,
+            ],
+            'template_code' => $row->template_code,
+            'template_name' => $row->template_name,
+            'submitted_by_name' => $requesterName,
+            'requester' => [
+                'name' => $requesterName,
+            ],
+        ];
+    }
+
+    private function normalizeRequestRow(object $row): array
+    {
+        $referenceType = (string) ($row->reference_type ?? '');
+        $currentStepName = $row->current_step_name ?? null;
+        $submittedAt = $row->submitted_at ?? null;
+
+        return [
+            'id' => $row->id,
+            'route_key' => $row->route_key,
+            'reference_type' => $referenceType,
+            'reference_type_label' => str_contains($referenceType, '\\')
+                ? class_basename($referenceType)
+                : $referenceType,
+            'reference_id' => $row->reference_id,
+            'status' => $row->status,
+            'current_step_order' => $row->current_step_order,
+            'current_step_name' => $currentStepName,
+            'current_step' => [
+                'name' => $currentStepName,
+                'order' => $row->current_step_order,
+            ],
+            'submitted_at' => $submittedAt,
+            'created_at' => $submittedAt,
+            'finalized_at' => $row->finalized_at,
+            'template_code' => $row->template_code,
+            'template_name' => $row->template_name,
+            'submitted_by_name' => $row->submitted_by_name,
+            'requester' => [
+                'name' => $row->submitted_by_name,
+            ],
+        ];
+    }
+
     public function templates(Request $request): JsonResponse
     {
         $rows = DB::table('approval_templates')
@@ -23,7 +112,7 @@ class ApprovalController extends Controller
             ->orderBy('code')
             ->paginate($request->integer('per_page', 20));
 
-        return response()->json($rows);
+        return $this->templateRowsResponse($rows);
     }
 
     public function upsertTemplate(Request $request, ?int $templateId = null): JsonResponse
@@ -155,6 +244,10 @@ class ApprovalController extends Controller
         $rows = DB::table('approval_requests as r')
             ->join('approval_templates as t', 't.id', '=', 'r.template_id')
             ->leftJoin('users as u', 'u.id', '=', 'r.submitted_by')
+            ->leftJoin('approval_request_steps as ars', function ($join) {
+                $join->on('ars.approval_request_id', '=', 'r.id')
+                    ->on('ars.step_order', '=', 'r.current_step_order');
+            })
             ->select(
                 'r.id',
                 'r.route_key',
@@ -166,7 +259,8 @@ class ApprovalController extends Controller
                 'r.finalized_at',
                 't.code as template_code',
                 't.name as template_name',
-                'u.name as submitted_by_name'
+                'u.name as submitted_by_name',
+                'ars.step_name as current_step_name'
             )
             ->when($request->filled('status'), fn ($q) => $q->where('r.status', $request->string('status')))
             ->when($request->filled('route_key'), fn ($q) => $q->where('r.route_key', $request->string('route_key')))
@@ -175,15 +269,21 @@ class ApprovalController extends Controller
             ->orderByDesc('r.id')
             ->paginate($request->integer('per_page', 20));
 
+        $rows->setCollection(
+            $rows->getCollection()->map(fn ($row) => $this->normalizeRequestRow($row))
+        );
+
         return response()->json($rows);
     }
 
     public function inbox(Request $request): JsonResponse
     {
         $uid = (int) $request->user()->id;
+        $typeFilter = $this->normalizeReferenceTypeFilter($request->input('type'));
         $rows = DB::table('approval_request_steps as rs')
             ->join('approval_requests as r', 'r.id', '=', 'rs.approval_request_id')
             ->join('approval_templates as t', 't.id', '=', 'r.template_id')
+            ->leftJoin('users as u', 'u.id', '=', 'r.submitted_by')
             ->where('r.status', 'pending')
             ->where('rs.status', 'pending')
             ->whereRaw('JSON_CONTAINS(rs.approver_snapshot_json, JSON_ARRAY(?))', [$uid])
@@ -196,14 +296,27 @@ class ApprovalController extends Controller
                 'rs.step_order',
                 'rs.step_name',
                 't.code as template_code',
-                't.name as template_name'
+                't.name as template_name',
+                'u.name as submitted_by_name'
             )
             ->when($request->filled('from'), fn ($q) => $q->whereDate('r.submitted_at', '>=', $request->from))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('r.submitted_at', '<=', $request->to))
-            ->when($request->filled('type'), fn ($q) => $q->where('r.reference_type', $request->type))
-            ->when($request->filled('search'), fn ($q) => $q->where('r.route_key', 'like', "%{$request->search}%"))
+            ->when($typeFilter, fn ($q) => $q->whereIn('r.reference_type', $typeFilter))
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $needle = trim((string) $request->input('search'));
+                $q->where(function ($sub) use ($needle) {
+                    $sub->where('r.route_key', 'like', "%{$needle}%")
+                        ->orWhere('t.code', 'like', "%{$needle}%")
+                        ->orWhere('t.name', 'like', "%{$needle}%")
+                        ->orWhereRaw('CAST(r.reference_id AS CHAR) like ?', ["%{$needle}%"]);
+                });
+            })
             ->orderBy('r.submitted_at')
             ->paginate($request->integer('per_page', 20));
+
+        $rows->setCollection(
+            $rows->getCollection()->map(fn ($row) => $this->normalizeInboxRow($row))
+        );
 
         return response()->json($rows);
     }
@@ -230,6 +343,17 @@ class ApprovalController extends Controller
 
     public function decide(Request $request, int $requestId): JsonResponse
     {
+        $rawAction = trim((string) $request->input('action'));
+        $resolvedDecision = match ($rawAction) {
+            'approve' => 'approved',
+            'reject' => 'rejected',
+            default => $request->input('decision'),
+        };
+
+        $request->merge([
+            'decision' => $resolvedDecision,
+        ]);
+
         $validated = $request->validate([
             'decision' => 'required|in:approved,rejected',
             'notes' => 'nullable|string|max:5000',

@@ -1,14 +1,14 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 import { authService } from '../services/auth.service';
 import { setupPushNotifications } from '../utils/notifications';
+import * as storage from '../utils/storage';
 
 async function syncPushToken() {
   try {
     const token = await setupPushNotifications();
     if (!token) return;
     await authService.updateFcmToken(token, { provider: 'expo', isActive: true });
-    await SecureStore.setItemAsync('push_token', token);
+    await storage.setItemAsync('push_token', token);
   } catch (error) {
     console.warn('Push token sync failed:', error);
   }
@@ -18,6 +18,7 @@ export const useAuthStore = create((set) => ({
   user: null,
   token: null,
   isLoading: false,
+  hasRestoredSession: false,
   isAuthenticated: false,
   error: null,
 
@@ -25,7 +26,7 @@ export const useAuthStore = create((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await authService.login(login, password);
-      await SecureStore.setItemAsync('auth_token', response.token);
+      await storage.setItemAsync('auth_token', response.token);
       await syncPushToken();
       set({
         token: response.token,
@@ -47,14 +48,14 @@ export const useAuthStore = create((set) => ({
   logout: async () => {
     set({ isLoading: true });
     try {
-      const pushToken = await SecureStore.getItemAsync('push_token');
+      const pushToken = await storage.getItemAsync('push_token');
       await authService.logout(pushToken || null);
     } catch (error) {
       console.warn('Logout error:', error);
     } finally {
       try {
-        await SecureStore.deleteItemAsync('auth_token');
-        await SecureStore.deleteItemAsync('push_token');
+        await storage.deleteItemAsync('auth_token');
+        await storage.deleteItemAsync('push_token');
       } catch (e) {
         console.warn('Failed to delete token:', e);
       }
@@ -70,8 +71,8 @@ export const useAuthStore = create((set) => ({
 
   forceLoggedOut: async () => {
     try {
-      await SecureStore.deleteItemAsync('auth_token');
-      await SecureStore.deleteItemAsync('push_token');
+      await storage.deleteItemAsync('auth_token');
+      await storage.deleteItemAsync('push_token');
     } catch (e) {
       console.warn('Failed to delete token:', e);
     }
@@ -88,7 +89,7 @@ export const useAuthStore = create((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await authService.register(data);
-      await SecureStore.setItemAsync('auth_token', response.token);
+      await storage.setItemAsync('auth_token', response.token);
       set({
         token: response.token,
         user: response.user,
@@ -106,9 +107,9 @@ export const useAuthStore = create((set) => ({
   },
 
   restoreSession: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, hasRestoredSession: false });
     try {
-      const token = await SecureStore.getItemAsync('auth_token');
+      const token = await storage.getItemAsync('auth_token');
       if (token) {
         const user = await authService.getProfile();
         await syncPushToken();
@@ -117,16 +118,28 @@ export const useAuthStore = create((set) => ({
           user,
           isAuthenticated: true,
         });
+      } else {
+        set({
+          token: null,
+          user: null,
+          isAuthenticated: false,
+        });
       }
     } catch (error) {
       console.warn('Session restore failed:', error);
       try {
-        await SecureStore.deleteItemAsync('auth_token');
+        await storage.deleteItemAsync('auth_token');
+        await storage.deleteItemAsync('push_token');
       } catch (_e) {
         // ignore
       }
+      set({
+        token: null,
+        user: null,
+        isAuthenticated: false,
+      });
     } finally {
-      set({ isLoading: false });
+      set({ isLoading: false, hasRestoredSession: true });
     }
   },
 

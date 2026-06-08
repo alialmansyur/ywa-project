@@ -21,6 +21,8 @@ import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
 import { AssetPickerField } from '../../../../components/common/AssetPickerField';
 
 const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
+const ACTIVE_WORKSHOP_STATUSES = ['registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold'];
+const HISTORY_VISIBLE_STATUSES = [...ACTIVE_WORKSHOP_STATUSES, 'completed'];
 const STATION_STEP_ORDER_TO_CODE = {
   30: 'WASHING_BAY',
   40: 'INSPECTION_PKB',
@@ -95,22 +97,52 @@ export default function WorkshopRegistration() {
       await loadCurrentAssignment();
     } catch (_e) {}
     try {
-      const [res, queueSnapshot] = await Promise.all([
-        workOrdersService.getAll(1, 20, undefined, undefined, filters.search, filters.from, filters.to),
+      const [res, activeRes, queueSnapshot] = await Promise.all([
+        workOrdersService.getAll(1, 100, undefined, undefined, filters.search, filters.from, filters.to),
+        workOrdersService.getAll(1, 100, undefined, undefined, filters.search),
         workshopService.controlTowerWorkOrders(),
       ]);
-      const baseRows = (res.items || [])
-        .filter((x) => ['registered', 'triage', 'pending', 'approved', 'in_progress', 'completed', 'on_hold'].includes(x.status))
+      const filteredRows = (res.items || [])
+        .filter((x) => HISTORY_VISIBLE_STATUSES.includes(String(x.status || '').toLowerCase()))
         .filter((x) => !effectiveAssetId || String(x?.asset_id || x?.asset?.id || '') === String(effectiveAssetId));
+      const activeRowsOutsideDateFilter = activeRes?.items || [];
+      const activeRows = (Array.isArray(activeRowsOutsideDateFilter) ? activeRowsOutsideDateFilter : [])
+        .filter((x) => ACTIVE_WORKSHOP_STATUSES.includes(String(x.status || '').toLowerCase()))
+        .filter((x) => !effectiveAssetId || String(x?.asset_id || x?.asset?.id || '') === String(effectiveAssetId));
+      const mergedById = new Map();
+      [...activeRows, ...filteredRows].forEach((row) => {
+        if (!row?.id) return;
+        mergedById.set(String(row.id), row);
+      });
+      const baseRows = Array.from(mergedById.values())
+        .sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0));
       const queueRows = Array.isArray(queueSnapshot) ? queueSnapshot : queueSnapshot?.data || queueSnapshot?.work_orders || [];
       const queueByWorkOrderId = new Map(queueRows.map((row) => [String(row?.wo_id || row?.id || ''), row]));
-      const rows = baseRows.map((x) => {
-        const queueRow = queueByWorkOrderId.get(String(x.id));
-        const progress = queueRow
-          ? getStepProgressFromQueueRow(queueRow, x.status)
-          : getStepProgress([], x.status);
-        return { ...x, ...progress };
-      });
+      const rows = await Promise.all(
+        baseRows.map(async (x) => {
+          const queueRow = queueByWorkOrderId.get(String(x.id));
+          if (queueRow) {
+            return {
+              ...x,
+              ...getStepProgressFromQueueRow(queueRow, x.status),
+            };
+          }
+
+          try {
+            const process = await workshopService.processData(String(x.id));
+            const latest = (process?.instances || [])[0] || null;
+            return {
+              ...x,
+              ...getStepProgress(latest?.step_logs || [], x.status),
+            };
+          } catch (_e) {
+            return {
+              ...x,
+              ...getStepProgress([], x.status),
+            };
+          }
+        }),
+      );
       if (loadSeq !== loadSeqRef.current) return;
       setHistory(rows);
     } catch (_e) {

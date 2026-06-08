@@ -285,7 +285,7 @@ export function WorkshopControlTowerPage() {
           <>
             <div>
               <h2 className="text-lg font-bold">Workshop Control</h2>
-              <p className="text-sm text-slate-400">Dashboard antrean step dan downtime realtime workshop.</p>
+              <p className="text-sm text-slate-400">Dashboard antrean step dan SLA gap realtime workshop.</p>
             </div>
             <button onClick={handleReload} className="px-4 py-2 rounded-xl text-sm border border-slate-600 text-slate-200 hover:bg-slate-700/50">Muat Ulang</button>
           </>
@@ -324,7 +324,7 @@ export function WorkshopControlTowerPage() {
         <div className="card p-3"><div className="text-xs text-slate-400">WO Selesai</div><div className="text-xl font-semibold mt-1">{completedCount}</div></div>
         <div className="card p-3"><div className="text-xs text-slate-400">On Hold</div><div className="text-xl font-semibold mt-1">{overview?.hold_wo || 0}</div></div>
         <div className="card p-3"><div className="text-xs text-slate-400">Late Steps</div><div className="text-xl font-semibold mt-1">{overview?.late_steps || 0}</div></div>
-        <div className="card p-3"><div className="text-xs text-slate-400">Downtime Today</div><div className="text-xl font-semibold mt-1">{overview?.total_downtime_today || 0}m</div></div>
+        <div className="card p-3"><div className="text-xs text-slate-400">SLA Gap Today</div><div className="text-xl font-semibold mt-1">{overview?.total_sla_gap_today ?? overview?.total_downtime_today ?? 0}m</div></div>
       </div>
 
       {!hasLoaded ? (
@@ -440,7 +440,7 @@ export function WorkshopControlTowerPage() {
                         <div key={s.id} className="rounded-lg border border-slate-700 p-3 text-xs">
                           <div className="flex justify-between"><div className="font-semibold">{s.step_name}</div><span className={`px-2 py-0.5 rounded ${stepStatusBadge(s.status)}`}>{s.status}</span></div>
                           <div className="text-slate-400 mt-1">IN: {fmtTime(s.process_in_at)} | OUT: {fmtTime(s.process_out_at)}</div>
-                          <div className="text-slate-400">EST {s.est_minutes || 0}m · ACT {s.actual_minutes || 0}m · DT {s.downtime_minutes || 0}m</div>
+                          <div className="text-slate-400">EST {s.est_minutes || 0}m · ACT {s.actual_minutes || 0}m · GAP {(Number(s.actual_minutes || 0) - Number(s.est_minutes || 0))}m</div>
                         </div>
                       ))}
                     </div>
@@ -453,7 +453,8 @@ export function WorkshopControlTowerPage() {
                       <div className="text-sm space-y-1">
                         <div>Est: {woMetrics.total_est_minutes} menit</div>
                         <div>Actual: {woMetrics.total_actual_minutes} menit</div>
-                        <div>Downtime: {woMetrics.total_downtime_minutes} menit</div>
+                        <div>SLA Gap: {woMetrics.total_sla_gap_minutes ?? woMetrics.variance_minutes ?? ((Number(woMetrics.total_actual_minutes || 0) - Number(woMetrics.total_est_minutes || 0)))} menit</div>
+                        <div>Reported Downtime: {woMetrics.total_downtime_minutes} menit</div>
                         <div>Late Steps: {woMetrics.late_steps}</div>
                       </div>
                     ) : <div className="text-sm text-slate-400">Belum ada metrik.</div>}

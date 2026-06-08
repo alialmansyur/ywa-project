@@ -55,3 +55,11 @@ export async function postJson(path, body = {}, config = {}) {
     throw normalizeError(error)
   }
 }
+
+export async function revokeSession() {
+  try {
+    await api.post('/auth/logout')
+  } catch {
+    // Best-effort revoke: local session cleanup still happens on the client.
+  }
+}

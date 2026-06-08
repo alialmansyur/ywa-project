@@ -17,6 +17,13 @@ function SkeletonBox({ className = '' }) {
   return <div className={`animate-pulse rounded-xl bg-slate-700/60 ${className}`} />
 }
 
+function extractRows(response) {
+  if (Array.isArray(response?.items)) return response.items
+  if (Array.isArray(response?.data)) return response.data
+  if (Array.isArray(response)) return response
+  return []
+}
+
 export function ApprovalMatrixPage() {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(false)
@@ -47,7 +54,7 @@ export function ApprovalMatrixPage() {
     setLoading(true)
     try {
       const response = await apiRequest('/settings/approvals/templates')
-      setTemplates(response.data || response || [])
+      setTemplates(extractRows(response))
     } catch (error) {
       await swal.fire({ icon: 'error', title: 'Gagal', text: error instanceof ApiError ? error.message : 'Gagal memuat template approval.' })
     } finally {
@@ -60,7 +67,7 @@ export function ApprovalMatrixPage() {
     setStepsLoading(true)
     try {
       const response = await apiRequest(`/settings/approvals/templates/${templateId}/steps`)
-      setSteps(response.data || response || [])
+      setSteps(extractRows(response))
     } catch (error) {
       await swal.fire({ icon: 'error', title: 'Gagal', text: 'Gagal memuat tahapan approval.' })
     } finally {
@@ -71,7 +78,7 @@ export function ApprovalMatrixPage() {
   const fetchRoles = async () => {
     try {
       const response = await apiRequest('/settings/roles')
-      setRoles(response.data || response || [])
+      setRoles(extractRows(response))
     } catch (e) {
       // ignore
     }
@@ -192,9 +199,16 @@ export function ApprovalMatrixPage() {
   const openAssignUsers = (s) => {
     setAssignUsersModal({ step: s })
     setSelectedUserIds(s.users?.map(u => u.id) || [])
+    setUserSearchTerm('')
   }
 
   const saveAssignedUsers = async () => {
+    if (!selectedTemplate || !assignUsersModal?.step?.id) return
+    if (selectedUserIds.length === 0) {
+      await swal.fire({ icon: 'warning', title: 'Validasi', text: 'Pilih minimal satu approver sebelum menyimpan.' })
+      return
+    }
+
     try {
       await apiRequest(`/settings/approvals/templates/${selectedTemplate.id}/steps/${assignUsersModal.step.id}/users`, {
         method: 'PUT',

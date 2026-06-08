@@ -1293,8 +1293,15 @@ html.theme-light .cal-cell {
   margin-bottom: 0.65rem;
 }
 .tower-table-panel { display: flex; flex-direction: column; min-height: 0; }
-.tower-table-panel .table-wrap { max-height: none; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; }
-.tower-table-panel .table-wrap::-webkit-scrollbar { display: none; }
+.tower-table-panel .table-wrap { max-height: none; overflow: auto; }
+.tower-table-scroll-pane {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tower-table-scroll-pane::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 
 .tower-active-table {
   font-size: calc(1.08rem + 2px);
@@ -2214,7 +2221,18 @@ html.theme-light .settings-modal {
 .dashboard-display-root, .dashboard-display-root body { overflow: hidden; }
 .dashboard-display-root .dashboard-shell { overflow: hidden; }
 .dashboard-display-root .dashboard-main { overflow-y: auto; overflow-x: hidden; }
-.dashboard-display-root .queue-auto-scroll { max-height: calc(100vh - 390px); overflow-y: auto; scroll-behavior: auto; }
+.dashboard-display-root .queue-auto-scroll {
+  max-height: calc(100vh - 390px);
+  overflow-y: auto;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dashboard-display-root .queue-auto-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 .dashboard-display-root .queue-auto-scroll thead th { position: sticky; top: 0; z-index: 3; }
 .dashboard-display-root .queue-panel { min-height: 0; }
 .dashboard-display-root .tower-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -2301,15 +2319,23 @@ html.theme-light .settings-modal {
 .dashboard-display-root .tower-slide-page .tower-main-grid {
   grid-template-columns: 1.8fr 1fr;
   min-height: 0;
-  align-items: start;
+  align-items: stretch;
 }
 .dashboard-display-root .tower-slide-page .tower-table-panel {
-  display: block;
-  min-height: fit-content;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.dashboard-display-root .tower-slide-page .tower-feed-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .dashboard-display-root .tower-slide-page .tower-table-panel .table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: none;
-  overflow: visible;
+  overflow: auto;
 }
 .dashboard-display-root .tower-slide-page .tower-table-panel .table-wrap table {
   width: 100%;
@@ -2343,6 +2369,25 @@ html.theme-light .settings-modal {
   grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   overflow-x: auto;
   overflow-y: hidden;
+}
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-slide-page {
+  height: 100%;
+  min-height: 100%;
+}
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-main-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-table-panel,
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-feed-panel {
+  height: 100%;
+  min-height: 0;
+}
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-table-panel .table-wrap,
+.dashboard-display-root.dashboard-main-kpi-hidden .tower-feed-list {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .dashboard-display-root.dashboard-main-kpi-hidden .tower-bay-list {
   max-height: 15rem !important;

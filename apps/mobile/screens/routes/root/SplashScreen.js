@@ -8,11 +8,13 @@ import { useAuthStore } from '../../../stores/auth.store';
 export default function SplashScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const { restoreSession, isAuthenticated } = useAuthStore();
+  const { restoreSession, hasRestoredSession, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     restoreSession();
+  }, [restoreSession]);
 
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -26,13 +28,19 @@ export default function SplashScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+  }, [fadeAnim, scaleAnim]);
+
+  useEffect(() => {
+    if (!hasRestoredSession) {
+      return undefined;
+    }
 
     const timer = setTimeout(() => {
       router.replace(isAuthenticated ? '/(tabs)' : '/(auth)/login');
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, scaleAnim, isAuthenticated, restoreSession]);
+  }, [hasRestoredSession, isAuthenticated]);
 
   return (
     <View style={styles.container}>

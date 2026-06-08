@@ -336,9 +336,7 @@ export function FindingsPage() {
                     placeholder="Tambahkan feedback penyelesaian temuan..."
                   />
                 </label>
-                {updateStatus === 'resolved' ? (
                   <div className="text-xs text-slate-500">Feedback wajib diisi saat mengubah status menjadi resolved.</div>
-                ) : null}
               </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button type="button" onClick={() => setStatusModal(false)} className="px-4 py-2 rounded-xl border border-slate-600 text-slate-300 text-sm">Batal</button>

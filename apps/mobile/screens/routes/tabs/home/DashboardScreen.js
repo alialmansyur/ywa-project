@@ -31,6 +31,7 @@ import { dashboardService } from '../../../../services/dashboard.service';
 import { workOrdersService } from '../../../../services/work-orders.service';
 import { workshopService } from '../../../../services/workshop.service';
 import { useActiveAssetStore } from '../../../../stores/active-asset.store';
+import { useAuthStore } from '../../../../stores/auth.store';
 
 const MENU_MAP = {
   workshop: { id: 1, title: 'Workshop', icon: Wrench, color: '#3B82F6', route: '/(tabs)/workshop' },
@@ -107,17 +108,20 @@ const toIso = (d) => {
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 };
+const ACTIVE_WORK_ORDER_STATUSES = ['registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold'];
 
 export default function DashboardScreen() {
   const hasLoadedRef = useRef(false);
   const [overview, setOverview] = useState(null);
   const { activeAsset, loadCurrentAssignment } = useActiveAssetStore();
+  const { user } = useAuthStore();
 
   const [greeting, setGreeting] = useState('Selamat datang');
   const [weatherInfo, setWeatherInfo] = useState({ title: 'Mencari lokasi...', desc: 'Mohon tunggu...', icon: CloudRain });
   const [menuKeys, setMenuKeys] = useState(DEFAULT_MENU_KEYS);
   const [todayWo, setTodayWo] = useState(null);
   const [loadingTodayWo, setLoadingTodayWo] = useState(false);
+  const [menuWorkOrderBadgeCount, setMenuWorkOrderBadgeCount] = useState(0);
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   const assetAnim = useRef(new Animated.Value(0)).current;
@@ -162,19 +166,30 @@ export default function DashboardScreen() {
     })();
   }, []);
 
+  const normalizedRole = String(user?.role || '').toLowerCase();
+  const isOperatorRole = normalizedRole.includes('operator');
+
   const loadDashboard = React.useCallback(async () => {
     try {
+      const assignment = await loadCurrentAssignment().catch(() => null);
+      const assignedAssetId = String(assignment?.asset?.id || activeAsset?.id || '');
       const [dashboard, woRes] = await Promise.all([
         dashboardService.overview(),
-        workOrdersService.getAll(1, 30),
+        workOrdersService.getAll(1, 100),
       ]);
       setOverview(dashboard);
-      await loadCurrentAssignment();
 
       setLoadingTodayWo(true);
-      const activeStatuses = ['registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold'];
       const todayKey = toDateKey(new Date());
       const woItems = woRes.items || [];
+      const badgeCount = isOperatorRole
+        ? woItems.filter((x) => {
+            if (!assignedAssetId) return false;
+            const workOrderAssetId = String(x?.asset_id || x?.asset?.id || '');
+            return workOrderAssetId === assignedAssetId && ACTIVE_WORK_ORDER_STATUSES.includes(String(x?.status || '').toLowerCase());
+          }).length
+        : Number(dashboard?.active_work_orders ?? 0);
+      setMenuWorkOrderBadgeCount(badgeCount);
 
       const resolvedRows = await Promise.all(
         woItems.map(async (x) => {
@@ -209,16 +224,21 @@ export default function DashboardScreen() {
         }),
       );
 
-      const activeRows = resolvedRows.filter((x) => activeStatuses.includes(x.resolvedStatus));
+      const activeRows = resolvedRows.filter((x) => ACTIVE_WORK_ORDER_STATUSES.includes(x.resolvedStatus));
+      const scopedActiveRows = isOperatorRole && assignedAssetId
+        ? activeRows.filter((x) => String(x?.asset_id || x?.asset?.id || '') === assignedAssetId)
+        : activeRows;
       const activeToday = activeRows
+        .filter((x) => !isOperatorRole || !assignedAssetId || String(x?.asset_id || x?.asset?.id || '') === assignedAssetId)
         .filter((x) => toDateKey(x.created_at) === todayKey)
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-      const fallbackActive = activeRows.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      const fallbackActive = scopedActiveRows.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       setTodayWo(activeToday[0] || fallbackActive[0] || null);
     } catch (_e) {
       setOverview(null);
       setTodayWo(null);
+      setMenuWorkOrderBadgeCount(0);
     } finally {
       setLoadingTodayWo(false);
     }
@@ -236,7 +256,7 @@ export default function DashboardScreen() {
     }
 
     setMenuKeys(DEFAULT_MENU_KEYS);
-  }, [loadCurrentAssignment]);
+  }, [activeAsset?.id, isOperatorRole, loadCurrentAssignment]);
 
   useEffect(() => {
     hasLoadedRef.current = true;
@@ -255,7 +275,7 @@ export default function DashboardScreen() {
   const woActive = overview?.active_work_orders ?? 0;
   const safetyScore = overview?.p2h_today?.compliance_pct;
   const incidentFree = overview?.mttr_minutes_month;
-  const priorityBadgeCount = Number(woActive || 0);
+  const priorityBadgeCount = Number(menuWorkOrderBadgeCount || 0);
   const breakdownBadgeCount = Number(overview?.breakdown_today ?? 0);
 
   const dueText = todayWo?.scheduled_end

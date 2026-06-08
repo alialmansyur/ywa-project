@@ -16,6 +16,11 @@ function SkeletonBox({ className = '' }) {
   return <div className={`animate-pulse rounded-xl bg-slate-700/60 ${className}`} />
 }
 
+function normalizeReferenceTypeLabel(value) {
+  const raw = String(value || '')
+  return raw.includes('\\') ? raw.split('\\').pop() : raw
+}
+
 function StatusBadge({ status }) {
   const map = {
     pending: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
@@ -145,12 +150,12 @@ export function ApprovalHistoryPage() {
                 requests.map((req) => (
                   <tr key={req.id} className="hover:bg-slate-700/20">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-blue-300">{req.reference_type}</div>
+                      <div className="font-semibold text-blue-300">{req.reference_type_label || normalizeReferenceTypeLabel(req.reference_type)}</div>
                       <div className="text-xs text-slate-400">ID: {req.reference_id}</div>
                     </td>
                     <td className="py-3 px-4 text-slate-300">{req.requester?.name || '-'}</td>
                     <td className="py-3 px-4"><StatusBadge status={req.status} /></td>
-                    <td className="py-3 px-4 text-slate-300">{req.current_step?.name || '-'}</td>
+                    <td className="py-3 px-4 text-slate-300">{req.current_step?.name || req.current_step_name || '-'}</td>
                     <td className="py-3 px-4 text-slate-300">{req.created_at ? new Date(req.created_at).toLocaleDateString() : '-'}</td>
                   </tr>
                 ))

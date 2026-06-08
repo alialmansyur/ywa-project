@@ -7,6 +7,7 @@ import { AppHeader } from '../components/common/AppHeader';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import { resolveMobileNotificationRoute } from '../utils/notificationRoutes';
+import { configureNotificationHandler } from '../utils/notifications';
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,8 @@ function RootNavigation() {
   useThemeContext();
 
   useEffect(() => {
+    configureNotificationHandler();
+
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const route = resolveMobileNotificationRoute(response.notification.request.content.data);
       if (typeof route === 'string' && route.trim() !== '') {

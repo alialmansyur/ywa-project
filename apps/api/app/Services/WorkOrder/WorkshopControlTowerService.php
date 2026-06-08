@@ -7,6 +7,28 @@ use Illuminate\Support\Facades\DB;
 
 class WorkshopControlTowerService
 {
+    private const WEB_BAY_STEP_CODES = [
+        'registration' => ['REGISTRATION'],
+        'approval' => ['APPROVAL'],
+        'washing_bay' => ['WASHING_BAY', 'BAY_WASHING'],
+        'inspection_pkb' => ['INSPECTION_PKB', 'INSPECTION'],
+        'checking' => ['CHECKING', 'UNIT_CHECK_PART_NEED'],
+        'waiting_bay' => ['WAITING_BAY', 'BAY_WAITING'],
+        'create_wo' => ['CREATE_WO', 'KRANI_WO_JOBCARD'],
+        'repair' => ['REPAIR', 'SERVICE_REPAIR', 'PART_SUPPLY', 'EXECUTION', 'ACTION'],
+        'qc' => ['QC', 'QC_CHECK'],
+        'ready_bay_close' => ['READY_BAY_CLOSE', 'CLOSE_WO', 'CLOSE'],
+        'handover' => ['HANDOVER'],
+    ];
+
+    private const CURRENT_BAY_VALUES = [
+        'washing_bay',
+        'waiting_bay',
+        'service_bay',
+        'qc_bay',
+        'ready_bay',
+    ];
+
     public function overview(): array
     {
         $rows = $this->currentQueueBase()->get();
@@ -32,10 +54,16 @@ class WorkshopControlTowerService
             ->whereDate('updated_at', now()->toDateString())
             ->sum('downtime_minutes');
 
+        $todaySlaGap = (int) DB::table('wo_process_step_logs')
+            ->whereDate('updated_at', now()->toDateString())
+            ->selectRaw('SUM(COALESCE(actual_minutes, 0) - COALESCE(est_minutes, 0)) as total_gap_minutes')
+            ->value('total_gap_minutes');
+
         return [
             'active_wo' => $rows->count(),
             'hold_wo' => $rows->where('wo_status', 'on_hold')->count(),
             'late_steps' => $lateSteps,
+            'total_sla_gap_today' => $todaySlaGap,
             'total_downtime_today' => $todayDowntime,
             'bay_counts' => $byBay,
         ];
@@ -128,6 +156,7 @@ class WorkshopControlTowerService
     {
         $from = $request->input('from') ?: now()->subDays(7)->toDateString();
         $to = $request->input('to') ?: now()->toDateString();
+        $queueRows = $this->applyFilters($this->currentQueueBase(), $request)->get();
 
         $byActual = DB::table('wo_process_step_logs')
             ->select('step_code', DB::raw('AVG(actual_minutes) as avg_actual_minutes'), DB::raw('COUNT(*) as sample_count'))
@@ -146,6 +175,17 @@ class WorkshopControlTowerService
             ->limit(5)
             ->get();
 
+        $bySlaGap = DB::table('wo_process_step_logs')
+            ->select(
+                'step_code',
+                DB::raw('SUM(COALESCE(actual_minutes, 0) - COALESCE(est_minutes, 0)) as total_sla_gap_minutes')
+            )
+            ->whereBetween(DB::raw('DATE(updated_at)'), [$from, $to])
+            ->groupBy('step_code')
+            ->orderByDesc('total_sla_gap_minutes')
+            ->limit(5)
+            ->get();
+
         $byBay = DB::table('wo_process_step_logs')
             ->select('bay_in', DB::raw('AVG(queue_minutes) as avg_queue_minutes'), DB::raw('COUNT(*) as sample_count'))
             ->whereBetween(DB::raw('DATE(updated_at)'), [$from, $to])
@@ -155,10 +195,48 @@ class WorkshopControlTowerService
             ->limit(5)
             ->get();
 
+        $summaryRow = $queueRows
+            ->sortByDesc(fn ($row) => (int) ($row->queue_minutes_live ?? 0))
+            ->first();
+
+        $late = $queueRows
+            ->filter(function ($row) {
+                $est = (int) ($row->est_minutes ?? 0);
+                if ($est <= 0) {
+                    return false;
+                }
+
+                $actual = (int) ($row->actual_minutes ?? 0);
+                $queueLive = (int) ($row->queue_minutes_live ?? 0);
+
+                return $actual > $est || $queueLive > $est;
+            })
+            ->count();
+
+        $hold = $queueRows
+            ->filter(fn ($row) => strtolower((string) ($row->wo_status ?? '')) === 'on_hold')
+            ->count();
+
+        $step = $summaryRow?->step_code
+            ?? $bySlaGap->first()?->step_code
+            ?? $byDowntime->first()?->step_code
+            ?? $byActual->first()?->step_code
+            ?? null;
+
         return [
             'top_by_actual' => $byActual,
+            'top_by_sla_gap' => $bySlaGap,
             'top_by_downtime' => $byDowntime,
             'top_bay_by_queue' => $byBay,
+            'summary' => [
+                'step' => $step,
+                'late' => $late,
+                'hold' => $hold,
+            ],
+            // Flat aliases for current dashboard consumer.
+            'step' => $step,
+            'late' => $late,
+            'hold' => $hold,
         ];
     }
 
@@ -224,6 +302,8 @@ class WorkshopControlTowerService
                 'wo.created_at as wo_created_at',
                 'a.code as asset_code',
                 'a.name as asset_name',
+                DB::raw('COALESCE(a.veh_plate_no, a.plate_number) as license_plate'),
+                DB::raw('COALESCE(a.veh_plate_no, a.plate_number) as police_no'),
                 'sup.name as supervisor_name',
                 'wpi.id as instance_id',
                 'wpi.state as instance_state',
@@ -254,8 +334,27 @@ class WorkshopControlTowerService
 
     private function applyFilters($query, Request $request)
     {
+        $stepCodeFilter = $this->resolveBayStepCodes($request->input('bay'));
+        $currentBayFilter = $this->resolveCurrentBayFilterValues($request->input('bay'));
+
         return $query
-            ->when($request->input('bay'), fn ($q, $bay) => $q->having('current_bay', '=', $bay))
+            ->when(! empty($stepCodeFilter), function ($q) use ($stepCodeFilter) {
+                if (count($stepCodeFilter) === 1) {
+                    return $q->where('s.step_code', '=', $stepCodeFilter[0]);
+                }
+
+                return $q->whereIn('s.step_code', $stepCodeFilter);
+            })
+            ->when(! empty($currentBayFilter), function ($q) use ($currentBayFilter) {
+                if (count($currentBayFilter) === 1) {
+                    return $q->having('current_bay', '=', $currentBayFilter[0]);
+                }
+
+                return $q->havingRaw(
+                    'current_bay IN (' . implode(', ', array_fill(0, count($currentBayFilter), '?')) . ')',
+                    $currentBayFilter
+                );
+            })
             ->when($request->input('wo_type'), fn ($q, $type) => $q->where('wo.type', $type))
             ->when($request->input('status'), fn ($q, $status) => $q->where('wo.status', $status))
             ->when($request->input('supervisor_id'), fn ($q, $supervisorId) => $q->where('wo.supervisor_id', $supervisorId))
@@ -270,5 +369,25 @@ class WorkshopControlTowerService
                         ->orWhere('s.step_name', 'like', "%{$needle}%");
                 });
             });
+    }
+
+    private function resolveBayStepCodes(mixed $bay): array
+    {
+        $value = strtolower(trim((string) $bay));
+        if ($value === '') {
+            return [];
+        }
+
+        return self::WEB_BAY_STEP_CODES[$value] ?? [];
+    }
+
+    private function resolveCurrentBayFilterValues(mixed $bay): array
+    {
+        $value = strtolower(trim((string) $bay));
+        if ($value === '') {
+            return [];
+        }
+
+        return in_array($value, self::CURRENT_BAY_VALUES, true) ? [$value] : [];
     }
 }

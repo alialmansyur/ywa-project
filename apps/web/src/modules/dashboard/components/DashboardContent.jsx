@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Swal from 'sweetalert2'
-import { TOKEN_KEY, getJson } from '../../../services/api'
+import { TOKEN_KEY, getJson, revokeSession } from '../../../services/api'
 import { DEFAULT_SETTINGS } from './constants'
 import { elapsedSeconds, isActiveWorkshopRow, resolveBoardColumn } from './utils'
 import { KpiIcon } from './icons'
@@ -17,6 +17,8 @@ import { AppTopbar } from '../../../layout/AppTopbar'
 import { AppSidebar } from '../../../layout/AppSidebar'
 
 export function DashboardContent({ me }) {
+  const isScheduleSlideEnabled = false
+  const isAnalystSlideEnabled = false
   const TOTAL_SLIDES = 2
   const [activeSlide, setActiveSlide] = useState(0)
   const [showKpi, setShowKpi] = useState(true)
@@ -119,14 +121,35 @@ export function DashboardContent({ me }) {
     refetchInterval: 10000,
   })
 
-  const scheduleQuery = useQuery({
-    queryKey: ['dashboard-schedule', scheduleQ, scheduleStatus, scheduleType],
+  const scheduleListQuery = useQuery({
+    queryKey: ['dashboard-schedule-list', scheduleQ, scheduleStatus, scheduleType],
+    enabled: isScheduleSlideEnabled,
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '200' })
       if (scheduleQ.trim()) params.set('q', scheduleQ.trim())
       if (scheduleStatus) params.set('status', scheduleStatus)
       if (scheduleType) params.set('type', scheduleType)
       return getJson(`/schedules?${params.toString()}`)
+    },
+    refetchInterval: 120000,
+  })
+
+  const scheduleUpcomingQuery = useQuery({
+    queryKey: ['dashboard-schedule-upcoming'],
+    enabled: isScheduleSlideEnabled,
+    queryFn: async () => getJson('/schedules/upcoming?days=7'),
+    refetchInterval: 120000,
+  })
+
+  const scheduleCalendarQuery = useQuery({
+    queryKey: ['dashboard-schedule-calendar', scheduleDate.getFullYear(), scheduleDate.getMonth()],
+    enabled: isScheduleSlideEnabled,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        year: String(scheduleDate.getFullYear()),
+        month: String(scheduleDate.getMonth() + 1),
+      })
+      return getJson(`/schedules/calendar?${params.toString()}`)
     },
     refetchInterval: 120000,
   })
@@ -139,6 +162,7 @@ export function DashboardContent({ me }) {
 
   const analystQuery = useQuery({
     queryKey: ['dashboard-analyst-30d'],
+    enabled: isAnalystSlideEnabled,
     queryFn: async () => {
       return getJson('/dashboard/analyst-summary?range=30')
     },
@@ -174,7 +198,7 @@ export function DashboardContent({ me }) {
     return out
   }, [towerRows])
 
-  const queueRows = useMemo(() => (towerQuery.data?.workOrders?.data || []).filter((row) => isActiveWorkshopRow(row)), [towerQuery.data])
+  const queueRows = useMemo(() => towerRows, [towerRows])
   const activeCount = towerRows.length
   const holdCount = towerRows.filter((row) => String(row.wo_status || '').toLowerCase() === 'on_hold').length
   const inProgressCount = towerRows.filter((row) => String(row.wo_status || '').toLowerCase() === 'in_progress').length
@@ -183,7 +207,7 @@ export function DashboardContent({ me }) {
   const downtimeTodayMinutes = Number(summaryQuery.data?.downtime_today_minutes || towerQuery.data?.overview?.total_downtime_today || 0)
   const woTodayCount = Number(summaryQuery.data?.wo_today_total || 0)
 
-  const dueNow = scheduleQuery.data?.data || []
+  const dueNow = scheduleUpcomingQuery.data?.schedules || []
   const dueTodayCount = Number(summaryQuery.data?.schedule_due_today_total || 0)
   const overdueCount = Number(summaryQuery.data?.schedule_overdue_total || 0)
   const upcomingCount = Number(summaryQuery.data?.schedule_upcoming_7d_total || 0)
@@ -194,11 +218,12 @@ export function DashboardContent({ me }) {
     const first = new Date(y, m, 1).getDay()
     const total = new Date(y, m + 1, 0).getDate()
     const calendarMap = {}
-    for (const row of dueNow) {
-      const key = row.next_due_at ? new Date(row.next_due_at).toISOString().slice(0, 10) : null
-      if (!key) continue
-      calendarMap[key] = (calendarMap[key] || 0) + 1
+
+    const days = scheduleCalendarQuery.data?.days || {}
+    for (const [key, value] of Object.entries(days)) {
+      calendarMap[key] = Number(value?.count || 0)
     }
+
     const cells = []
     for (let i = 0; i < first; i += 1) cells.push({ empty: true })
     for (let d = 1; d <= total; d += 1) {
@@ -207,12 +232,17 @@ export function DashboardContent({ me }) {
       cells.push({ d, key, count: calendarMap[key] || 0 })
     }
     return cells
-  }, [scheduleDate, dueNow])
+  }, [scheduleCalendarQuery.data?.days, scheduleDate])
 
   const scheduleRows = useMemo(() => {
-    if (!selectedDay) return dueNow
-    return dueNow.filter((row) => row.next_due_at && new Date(row.next_due_at).toISOString().slice(0, 10) === selectedDay)
-  }, [dueNow, selectedDay])
+    const listRows = scheduleListQuery.data?.data || []
+    if (!selectedDay) return listRows
+
+    const dayRows = scheduleCalendarQuery.data?.events_by_day?.[selectedDay]
+    if (Array.isArray(dayRows)) return dayRows
+
+    return listRows.filter((row) => row.next_due_at && new Date(row.next_due_at).toISOString().slice(0, 10) === selectedDay)
+  }, [scheduleCalendarQuery.data?.events_by_day, scheduleListQuery.data?.data, selectedDay])
 
   const queueRowsPrepared = useMemo(() => {
     const rows = queueRows.filter((row) => {
@@ -248,15 +278,49 @@ export function DashboardContent({ me }) {
 
   const connectionStatus = useMemo(() => {
     if (towerQuery.isError) return 'OFFLINE'
-    if (towerQuery.isFetching || scheduleQuery.isFetching || summaryQuery.isFetching || analystQuery.isFetching) return 'SYNCING'
+    if (
+      towerQuery.isFetching ||
+      summaryQuery.isFetching ||
+      (isScheduleSlideEnabled && (scheduleListQuery.isFetching || scheduleUpcomingQuery.isFetching || scheduleCalendarQuery.isFetching)) ||
+      (isAnalystSlideEnabled && analystQuery.isFetching)
+    ) return 'SYNCING'
     return 'LIVE'
-  }, [towerQuery.isError, towerQuery.isFetching, scheduleQuery.isFetching, summaryQuery.isFetching, analystQuery.isFetching])
+  }, [
+    analystQuery.isFetching,
+    isAnalystSlideEnabled,
+    isScheduleSlideEnabled,
+    scheduleCalendarQuery.isFetching,
+    scheduleListQuery.isFetching,
+    scheduleUpcomingQuery.isFetching,
+    summaryQuery.isFetching,
+    towerQuery.isError,
+    towerQuery.isFetching,
+  ])
 
   const latencyMs = useMemo(() => {
-    const latest = Math.max(Number(towerQuery.dataUpdatedAt || 0), Number(scheduleQuery.dataUpdatedAt || 0), Number(summaryQuery.dataUpdatedAt || 0), Number(analystQuery.dataUpdatedAt || 0), Number(woDetailQuery.dataUpdatedAt || 0))
+    const latest = Math.max(
+      Number(towerQuery.dataUpdatedAt || 0),
+      Number(summaryQuery.dataUpdatedAt || 0),
+      Number(isScheduleSlideEnabled ? scheduleListQuery.dataUpdatedAt || 0 : 0),
+      Number(isScheduleSlideEnabled ? scheduleUpcomingQuery.dataUpdatedAt || 0 : 0),
+      Number(isScheduleSlideEnabled ? scheduleCalendarQuery.dataUpdatedAt || 0 : 0),
+      Number(isAnalystSlideEnabled ? analystQuery.dataUpdatedAt || 0 : 0),
+      Number(woDetailQuery.dataUpdatedAt || 0),
+    )
     if (!latest) return 0
     return Math.max(0, now.getTime() - latest)
-  }, [towerQuery.dataUpdatedAt, scheduleQuery.dataUpdatedAt, summaryQuery.dataUpdatedAt, analystQuery.dataUpdatedAt, woDetailQuery.dataUpdatedAt, now])
+  }, [
+    analystQuery.dataUpdatedAt,
+    isAnalystSlideEnabled,
+    isScheduleSlideEnabled,
+    now,
+    scheduleCalendarQuery.dataUpdatedAt,
+    scheduleListQuery.dataUpdatedAt,
+    scheduleUpcomingQuery.dataUpdatedAt,
+    summaryQuery.dataUpdatedAt,
+    towerQuery.dataUpdatedAt,
+    woDetailQuery.dataUpdatedAt,
+  ])
 
   useEffect(() => {
     setKpiPrev((prev) => ({
@@ -267,7 +331,7 @@ export function DashboardContent({ me }) {
       downtime: downtimeTodayMinutes || prev.downtime,
     }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [towerQuery.dataUpdatedAt, scheduleQuery.dataUpdatedAt, summaryQuery.dataUpdatedAt])
+  }, [towerQuery.dataUpdatedAt, summaryQuery.dataUpdatedAt])
 
   useEffect(() => {
     const currentRows = queueRowsPrepared || []
@@ -305,7 +369,21 @@ export function DashboardContent({ me }) {
   const handleManualReload = async () => {
     setIsManualReloading(true)
     try {
-      await Promise.all([towerQuery.refetch(), scheduleQuery.refetch(), summaryQuery.refetch(), analystQuery.refetch(), selectedWoId ? woDetailQuery.refetch() : Promise.resolve()])
+      const tasks = [
+        towerQuery.refetch(),
+        summaryQuery.refetch(),
+        selectedWoId ? woDetailQuery.refetch() : Promise.resolve(),
+      ]
+
+      if (isScheduleSlideEnabled) {
+        tasks.push(scheduleListQuery.refetch(), scheduleUpcomingQuery.refetch(), scheduleCalendarQuery.refetch())
+      }
+
+      if (isAnalystSlideEnabled) {
+        tasks.push(analystQuery.refetch())
+      }
+
+      await Promise.all(tasks)
     } finally {
       setIsManualReloading(false)
     }
@@ -355,6 +433,7 @@ export function DashboardContent({ me }) {
       reverseButtons: true,
     })
     if (!result.isConfirmed) return
+    await revokeSession()
     localStorage.removeItem(TOKEN_KEY)
     window.location.href = '/login'
   }
@@ -370,16 +449,23 @@ export function DashboardContent({ me }) {
     const towerNotReady = !towerQuery.dataUpdatedAt && (towerQuery.isLoading || towerQuery.isFetching)
     const summaryNotReady = !summaryQuery.dataUpdatedAt && (summaryQuery.isLoading || summaryQuery.isFetching)
     return towerNotReady || summaryNotReady
-  }, [towerQuery.dataUpdatedAt, towerQuery.isLoading, towerQuery.isFetching, summaryQuery.dataUpdatedAt, summaryQuery.isLoading, summaryQuery.isFetching])
+  }, [
+    summaryQuery.dataUpdatedAt,
+    summaryQuery.isFetching,
+    summaryQuery.isLoading,
+    towerQuery.dataUpdatedAt,
+    towerQuery.isFetching,
+    towerQuery.isLoading,
+  ])
 
   return (
     <div className="dashboard-shell dashboard-with-sidebar">
-      <AppSidebar theme={theme} setTheme={setTheme} isFullscreen={isFullscreen} toggleFullscreen={toggleFullscreen} handleManualReload={handleManualReload} isReloading={towerQuery.isFetching || scheduleQuery.isFetching} openSettings={() => { setSettingsDraft(settings); setSettingsTab('general'); setShowSettings(true) }} handleLogout={handleLogout} showKpi={showKpi} setShowKpi={setShowKpi} />
+      <AppSidebar theme={theme} setTheme={setTheme} isFullscreen={isFullscreen} toggleFullscreen={toggleFullscreen} handleManualReload={handleManualReload} isReloading={towerQuery.isFetching || (isScheduleSlideEnabled && (scheduleListQuery.isFetching || scheduleUpcomingQuery.isFetching || scheduleCalendarQuery.isFetching)) || (isAnalystSlideEnabled && analystQuery.isFetching)} openSettings={() => { setSettingsDraft(settings); setSettingsTab('general'); setShowSettings(true) }} handleLogout={handleLogout} showKpi={showKpi} setShowKpi={setShowKpi} />
       <div className={showKpi ? "dashboard-main" : "dashboard-main dashboard-main-kpi-hidden"}>
         {isInitialDashboardLoading ? <DashboardSkeleton showKpi={showKpi} /> : (
           <>
             {runningTextItems.length > 0 ? <div className="running-text-wrap"><div className="running-text-track">{runningTextItems.map((text, index) => <span key={`${index}-${text}`}>{text}</span>)}</div></div> : null}
-            <AppTopbar settings={settings} now={now} lastUpdateAt={Math.max(Number(towerQuery.dataUpdatedAt || 0), Number(scheduleQuery.dataUpdatedAt || 0), Number(woDetailQuery.dataUpdatedAt || 0))} connectionStatus={connectionStatus} latencyMs={latencyMs} />
+            <AppTopbar settings={settings} now={now} lastUpdateAt={Math.max(Number(towerQuery.dataUpdatedAt || 0), Number(summaryQuery.dataUpdatedAt || 0), Number(woDetailQuery.dataUpdatedAt || 0))} connectionStatus={connectionStatus} latencyMs={latencyMs} />
             {showKpi && (
               <section className="kpi-grid">
                 <article className="kpi-card kpi-clickable" role="button" tabIndex={0} onClick={() => handleKpiDrilldown('active')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleKpiDrilldown('active')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Active WO</p><h3>{activeCount}</h3><small>{activeCount - kpiPrev.active >= 0 ? '+' : ''}{activeCount - kpiPrev.active}</small></div></div></article>
@@ -401,7 +487,7 @@ export function DashboardContent({ me }) {
           <div className="slider-window">
             <div className="slider-track" style={{ '--slide-count': TOTAL_SLIDES, width: `${TOTAL_SLIDES * 100}%`, transform: `translateX(-${activeSlide * (100 / TOTAL_SLIDES)}%)` }}>
               <SlideOneQueue settings={settings} queueRows={queueRowsFifo} onRowClick={(row) => setSelectedWoId(row.wo_id)} isLoading={towerQuery.isLoading} error={towerQuery.error} now={now} />
-              <SlideTwoControlTower settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} towerBay={towerBay} setTowerBay={setTowerBay} towerType={towerType} setTowerType={setTowerType} towerStatus={towerStatus} setTowerStatus={setTowerStatus} laneCards={boardBuckets} setSelectedWoId={setSelectedWoId} towerPageRows={towerRows.slice(0, 12)} towerTotal={towerRows.length} towerPage={1} towerPerPage={12} setTowerPerPage={() => {}} setTowerPage={() => {}} towerLastPage={1} towerQuery={towerQuery} isLoading={towerQuery.isLoading} error={towerQuery.error} bottleneckSummary={towerQuery.data?.bottlenecks || null} />
+              <SlideTwoControlTower settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} towerBay={towerBay} setTowerBay={setTowerBay} towerType={towerType} setTowerType={setTowerType} towerStatus={towerStatus} setTowerStatus={setTowerStatus} laneCards={boardBuckets} setSelectedWoId={setSelectedWoId} towerRows={towerRows} towerQuery={towerQuery} isLoading={towerQuery.isLoading} error={towerQuery.error} bottleneckSummary={towerQuery.data?.bottlenecks?.summary || towerQuery.data?.bottlenecks || null} />
               {/* <SlideThreeSchedule
                 settings={settings}
                 scheduleQ={scheduleQ}
@@ -418,8 +504,8 @@ export function DashboardContent({ me }) {
                 dueNow={dueNow}
                 schedules={dueNow}
                 scheduleRows={scheduleRows}
-                isLoading={scheduleQuery.isLoading}
-                error={scheduleQuery.error}
+                isLoading={scheduleListQuery.isLoading || scheduleUpcomingQuery.isLoading || scheduleCalendarQuery.isLoading}
+                error={scheduleListQuery.error || scheduleUpcomingQuery.error || scheduleCalendarQuery.error}
                 overdueCount={overdueCount}
                 dueTodayCount={dueTodayCount}
                 upcomingCount={upcomingCount}

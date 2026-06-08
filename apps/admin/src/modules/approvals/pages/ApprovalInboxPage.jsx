@@ -17,6 +17,11 @@ function SkeletonBox({ className = '' }) {
   return <div className={`animate-pulse rounded-xl bg-slate-700/60 ${className}`} />
 }
 
+function normalizeReferenceTypeLabel(value) {
+  const raw = String(value || '')
+  return raw.includes('\\') ? raw.split('\\').pop() : raw
+}
+
 export function ApprovalInboxPage() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(false)
@@ -50,7 +55,7 @@ export function ApprovalInboxPage() {
       if (search) params.set('search', search)
 
       const response = await apiRequest(`/approvals/inbox?${params.toString()}`)
-      setRequests(response.data || [])
+      setRequests(Array.isArray(response?.data) ? response.data : [])
       setTotal(response.total || 0)
       setLastPage(response.last_page || 1)
     } catch (error) {
@@ -83,7 +88,7 @@ export function ApprovalInboxPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: actionModal,
+          decision: actionModal === 'approve' ? 'approved' : 'rejected',
           notes: actionNotes,
         }),
       })
@@ -102,7 +107,7 @@ export function ApprovalInboxPage() {
   const defaultTabs = [
     { label: 'Work Order', value: 'App\\Models\\WorkOrder' },
     { label: 'Breakdown Report', value: 'App\\Models\\BreakdownReport' },
-    { label: 'P2H', value: 'App\\Models\\P2h' },
+    { label: 'P2H', value: 'App\\Models\\P2hSubmission' },
   ]
 
   const filteredRequests = requests // No longer client side filtering
@@ -205,7 +210,7 @@ export function ApprovalInboxPage() {
                 filteredRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-slate-700/20">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-blue-300">{req.reference_type?.includes('\\') ? req.reference_type.split('\\').pop() : req.reference_type}</div>
+                      <div className="font-semibold text-blue-300">{req.reference_type_label || normalizeReferenceTypeLabel(req.reference_type)}</div>
                       <div className="text-xs text-slate-400">ID: {req.reference_id}</div>
                     </td>
                     <td className="py-3 px-4 text-slate-300">{req.requester?.name || '-'}</td>
@@ -233,7 +238,7 @@ export function ApprovalInboxPage() {
               <div className="space-y-4">
                 <div>
                   <div className="text-xs text-slate-500">Referensi</div>
-                  <div className="text-sm text-slate-200">{selectedRequest.reference_type?.includes('\\') ? selectedRequest.reference_type.split('\\').pop() : selectedRequest.reference_type} #{selectedRequest.reference_id}</div>
+                  <div className="text-sm text-slate-200">{selectedRequest.reference_type_label || normalizeReferenceTypeLabel(selectedRequest.reference_type)} #{selectedRequest.reference_id}</div>
                 </div>
                 <label className="block">
                   <span className="text-xs text-slate-300 mb-1 block">Catatan/Feedback (Wajib)</span>

@@ -14,13 +14,7 @@ export function SlideTwoControlTower({
   setTowerStatus,
   laneCards,
   setSelectedWoId,
-  towerPageRows,
-  towerTotal,
-  towerPage,
-  towerPerPage,
-  setTowerPerPage,
-  setTowerPage,
-  towerLastPage,
+  towerRows,
   towerQuery,
   isLoading,
   error,
@@ -49,19 +43,19 @@ export function SlideTwoControlTower({
       <section className="panel tower-filter-panel">
         <div className="overflow-x-auto hide-scrollbar">
           <div className="tower-filter-grid tower-filter-strip">
-            <input value={towerQ} onChange={(e) => { setTowerPage(1); setTowerQ(e.target.value) }} placeholder="Cari WO/SAP/asset/step..." className="mini-input" />
-            <select value={towerBay} onChange={(e) => { setTowerPage(1); setTowerBay(e.target.value) }} className="mini-input">
+            <input value={towerQ} onChange={(e) => { setTowerQ(e.target.value) }} placeholder="Cari WO/SAP/asset/step..." className="mini-input" />
+            <select value={towerBay} onChange={(e) => { setTowerBay(e.target.value) }} className="mini-input">
               <option value="all">Semua Bay</option>
               {boardColumns.map((b) => <option key={b} value={b}>{BAY_LABEL[b]}</option>)}
             </select>
-            <select value={towerType} onChange={(e) => { setTowerPage(1); setTowerType(e.target.value) }} className="mini-input">
+            <select value={towerType} onChange={(e) => { setTowerType(e.target.value) }} className="mini-input">
               <option value="all">Semua Tipe WO</option>
               <option value="preventive">preventive</option>
               <option value="corrective">corrective</option>
               <option value="breakdown">breakdown</option>
               <option value="inspection">inspection</option>
             </select>
-            <select value={towerStatus} onChange={(e) => { setTowerPage(1); setTowerStatus(e.target.value) }} className="mini-input">
+            <select value={towerStatus} onChange={(e) => { setTowerStatus(e.target.value) }} className="mini-input">
               <option value="all">Semua Status WO</option>
               <option value="registered">registered</option>
               <option value="triage">triage</option>
@@ -103,7 +97,7 @@ export function SlideTwoControlTower({
           <h3>Antrian WO Aktif</h3>
           {isLoading ? <div className="panel-feedback panel-feedback-loading">Memuat data control tower...</div> : null}
           {error ? <div className="panel-feedback panel-feedback-error">Gagal memuat control tower. Coba refresh slide aktif.</div> : null}
-          <div className="table-wrap">
+          <div className="table-wrap tower-table-scroll-pane">
             <table className="tower-active-table">
               <thead>
                 <tr>
@@ -116,7 +110,7 @@ export function SlideTwoControlTower({
                 </tr>
               </thead>
               <tbody>
-                {towerPageRows.map((row) => (
+                {towerRows.map((row) => (
                   <tr key={`s2-${row.wo_id}`}>
                     <td>{row.wo_code}</td>
                     <td>{BAY_LABEL[row.current_bay] || row.current_bay || '-'}</td>
@@ -126,23 +120,12 @@ export function SlideTwoControlTower({
                     <td className="tower-status">{String(row.wo_status || '-').toUpperCase()}</td>
                   </tr>
                 ))}
-                {towerPageRows.length === 0 ? <tr><td colSpan={6} className="tower-empty-row">Tidak ada data antrean.</td></tr> : null}
+                {towerRows.length === 0 ? <tr><td colSpan={6} className="tower-empty-row">Tidak ada data antrean.</td></tr> : null}
               </tbody>
             </table>
           </div>
           <div className="tower-pagination">
-            <div>
-              Menampilkan {towerTotal === 0 ? 0 : ((towerPage - 1) * towerPerPage) + 1}-{Math.min(towerPage * towerPerPage, towerTotal)} dari {towerTotal} data
-            </div>
-            <div className="tower-pagination-actions">
-              <select value={towerPerPage} onChange={(e) => { setTowerPage(1); setTowerPerPage(Number(e.target.value)) }} className="mini-input tower-mini-select">
-                <option value={10}>10 / halaman</option>
-                <option value={25}>25 / halaman</option>
-                <option value={50}>50 / halaman</option>
-              </select>
-              <button type="button" onClick={() => setTowerPage((p) => Math.max(1, p - 1))} disabled={towerPage <= 1} className="tower-page-btn">Prev</button>
-              <button type="button" onClick={() => setTowerPage((p) => Math.min(towerLastPage, p + 1))} disabled={towerPage >= towerLastPage} className="tower-page-btn">Next</button>
-            </div>
+            <div>Menampilkan {towerRows.length} data aktif. Tabel mengikuti scroll kontainer dashboard.</div>
           </div>
         </section>
 

@@ -48,6 +48,84 @@ const STATION_STEP_CODES = STEP_CODES;
 const STARTABLE_WO_STATUSES = ['triage', 'pending', 'approved', 'in_progress'];
 const FINISH_FORM_STEPS = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 const DRAFT_PREFIX = '@mechanic_process_draft:';
+const WASH_PRE_CONDITION_OPTIONS = [
+  { label: 'Ringan', value: 'RINGAN' },
+  { label: 'Sedang', value: 'SEDANG' },
+  { label: 'Berat', value: 'BERAT' },
+];
+const WASH_POST_CONDITION_OPTIONS = [
+  { label: 'OK', value: 'OK' },
+  { label: 'Cuci Ulang', value: 'REWASH' },
+];
+const INSPECTION_RESULT_OPTIONS = [
+  { label: 'Normal', value: 'NORMAL' },
+  { label: 'Abnormal', value: 'ABNORMAL' },
+  { label: 'Follow Up', value: 'FOLLOW_UP' },
+];
+const WORK_PLAN_OPTIONS = [
+  { label: 'Lanjut Checking', value: 'LANJUT_CHECKING' },
+  { label: 'Lanjut Repair', value: 'LANJUT_REPAIR' },
+  { label: 'Menunggu Approval', value: 'MENUNGGU_APPROVAL' },
+];
+const OK_NG_OPTIONS = [
+  { label: 'OK', value: 'OK' },
+  { label: 'NG', value: 'NG' },
+];
+const PROCEED_STATUS_OPTIONS = [
+  { label: 'Lanjut Repair', value: 'LANJUT_REPAIR' },
+  { label: 'Menunggu Part', value: 'MENUNGGU_PART' },
+  { label: 'Tidak Lanjut', value: 'TIDAK_LANJUT' },
+];
+const WAITING_TYPE_OPTIONS = [
+  { label: 'Part', value: 'PART' },
+  { label: 'Slot Bay', value: 'SLOT_BAY' },
+  { label: 'Approval', value: 'APPROVAL' },
+  { label: 'Tool', value: 'TOOL' },
+  { label: 'External', value: 'EXTERNAL' },
+];
+const JOBCARD_CONFIRMATION_OPTIONS = [
+  { label: 'Sudah Cetak', value: 'SUDAH_CETAK' },
+  { label: 'Belum Cetak', value: 'BELUM_CETAK' },
+];
+const REPAIR_TECH_ACTION_OPTIONS = [
+  { label: 'Adjustment', value: 'ADJUSTMENT' },
+  { label: 'Repair', value: 'REPAIR' },
+  { label: 'Replace', value: 'REPLACE' },
+  { label: 'Cleaning', value: 'CLEANING' },
+];
+const REPAIR_OBSTACLE_OPTIONS = [
+  { label: 'Tidak Ada', value: 'TIDAK_ADA' },
+  { label: 'Part', value: 'PART' },
+  { label: 'Tool', value: 'TOOL' },
+  { label: 'Approval', value: 'APPROVAL' },
+  { label: 'Waktu', value: 'WAKTU' },
+  { label: 'Lainnya', value: 'LAINNYA' },
+];
+const CLOSING_STATUS_OPTIONS = [
+  { label: 'Ready Close', value: 'READY_CLOSE' },
+  { label: 'Pending Close', value: 'PENDING_CLOSE' },
+];
+const DOCUMENT_COMPLETENESS_OPTIONS = [
+  { label: 'Lengkap', value: 'LENGKAP' },
+  { label: 'Belum Lengkap', value: 'BELUM_LENGKAP' },
+];
+const HANDOVER_CONFIRMATION_OPTIONS = [
+  { label: 'Diserahterimakan', value: 'DISETERIMAKAN' },
+  { label: 'Ditunda', value: 'DITUNDA' },
+];
+const WAITING_ETA_OPTIONS = ['15 menit', '30 menit', '1 jam', '2 jam', '>2 jam'];
+const QC_PARAMETER_OPTIONS = ['Engine', 'Hydraulic', 'Electrical', 'Safety', 'Body'];
+const STEP_HELPER_COPY = {
+  WASHING_BAY: 'Isi hasil kondisi unit sebelum dan sesudah cuci. Gunakan catatan visual bila hasil cuci belum sesuai.',
+  INSPECTION_PKB: 'Pilih hasil inspeksi dan rencana kerja, lalu tambahkan ringkasan temuan bila ada abnormality.',
+  CHECKING: 'Gunakan hasil checkpoint dan status lanjut agar mekanik berikutnya tidak perlu menebak kondisi unit.',
+  WAITING_BAY: 'Pilih jenis waiting yang paling dominan, lalu isi alasan singkat dan ETA bila tersedia.',
+  CREATE_WO: 'Pastikan nomor SAP/WO terisi dan status jobcard sudah jelas sebelum step ditutup.',
+  REPAIR: 'Tuliskan aksi perbaikan utama, lalu pilih tindakan teknis dan kendala bila proses terhambat.',
+  QC: 'Pilih hasil QC secara tegas. Bila NG, jelaskan area rework agar proses balik lebih cepat.',
+  READY_BAY_CLOSE: 'Tentukan apakah unit siap close dan pastikan status kelengkapan dokumen tercatat.',
+  HANDOVER: 'Pilih status serah terima. Jika unit sudah diserahterimakan, isi nama penerimanya.',
+};
 
 export default function MechanicProcessScreen() {
   const { isRestrictedRole } = useMechanicAccessGuard();
@@ -309,13 +387,29 @@ export default function MechanicProcessScreen() {
     const requiredMap = {
       WASHING_BAY: ['pre_wash_condition', 'post_wash_condition'],
       INSPECTION_PKB: ['inspection_result', 'work_plan'],
-      CHECKING: ['checkpoint_result'],
-      WAITING_BAY: ['waiting_reason'],
-      CREATE_WO: ['sap_reference_no'],
+      CHECKING: ['checkpoint_result', 'proceed_status'],
+      WAITING_BAY: ['waiting_reason', 'waiting_type'],
+      CREATE_WO: ['sap_reference_no', 'jobcard_confirmation'],
       REPAIR: ['repair_action'],
-      QC: ['qc_result'],
-      READY_BAY_CLOSE: ['closing_status'],
+      QC: ['qc_result', 'qc_parameter'],
+      READY_BAY_CLOSE: ['closing_status', 'document_completeness'],
       HANDOVER: ['handover_confirmation'],
+    };
+    const enumMap = {
+      pre_wash_condition: WASH_PRE_CONDITION_OPTIONS.map((x) => x.value),
+      post_wash_condition: WASH_POST_CONDITION_OPTIONS.map((x) => x.value),
+      inspection_result: INSPECTION_RESULT_OPTIONS.map((x) => x.value),
+      work_plan: WORK_PLAN_OPTIONS.map((x) => x.value),
+      checkpoint_result: OK_NG_OPTIONS.map((x) => x.value),
+      proceed_status: PROCEED_STATUS_OPTIONS.map((x) => x.value),
+      waiting_type: WAITING_TYPE_OPTIONS.map((x) => x.value),
+      jobcard_confirmation: JOBCARD_CONFIRMATION_OPTIONS.map((x) => x.value),
+      technical_action: REPAIR_TECH_ACTION_OPTIONS.map((x) => x.value),
+      obstacle: REPAIR_OBSTACLE_OPTIONS.map((x) => x.value),
+      qc_result: OK_NG_OPTIONS.map((x) => x.value),
+      closing_status: CLOSING_STATUS_OPTIONS.map((x) => x.value),
+      document_completeness: DOCUMENT_COMPLETENESS_OPTIONS.map((x) => x.value),
+      handover_confirmation: HANDOVER_CONFIRMATION_OPTIONS.map((x) => x.value),
     };
     const requiredFields = requiredMap[stepCode] || [];
     const missing = requiredFields.find((key) => !String(finishForm[key] || '').trim());
@@ -323,8 +417,32 @@ export default function MechanicProcessScreen() {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Field wajib pada form Finish belum lengkap.' });
       return false;
     }
-    if (stepCode === 'QC' && !['OK', 'NOT_OK'].includes(String(finishForm.qc_result || '').toUpperCase())) {
-      showAlert({ type: 'warning', title: 'Perhatian', message: 'Hasil QC wajib diisi OK atau NOT_OK.' });
+    for (const [field, allowedValues] of Object.entries(enumMap)) {
+      const value = String(finishForm[field] || '').trim();
+      if (!value) continue;
+      if (!allowedValues.includes(value)) {
+        showAlert({ type: 'warning', title: 'Perhatian', message: 'Ada pilihan form yang tidak valid. Silakan pilih dari opsi yang tersedia.' });
+        return false;
+      }
+    }
+    if (stepCode === 'WASHING_BAY' && finishForm.post_wash_condition === 'REWASH' && !String(finishForm.visual_note || '').trim()) {
+      showAlert({ type: 'warning', title: 'Perhatian', message: 'Catatan visual wajib diisi bila hasil cuci perlu diulang.' });
+      return false;
+    }
+    if (stepCode === 'CHECKING' && finishForm.checkpoint_result === 'NG' && !String(finishForm.checking_summary || '').trim()) {
+      showAlert({ type: 'warning', title: 'Perhatian', message: 'Ringkasan temuan wajib diisi bila hasil checking NG.' });
+      return false;
+    }
+    if (stepCode === 'REPAIR' && ['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'].includes(String(finishForm.obstacle || '')) && !String(finishForm.hold_reason || '').trim()) {
+      showAlert({ type: 'warning', title: 'Perhatian', message: 'Detail kendala wajib diisi bila ada obstacle pada proses repair.' });
+      return false;
+    }
+    if (stepCode === 'QC' && String(finishForm.qc_result || '').toUpperCase() === 'NG' && !String(finishForm.rework_note || '').trim()) {
+      showAlert({ type: 'warning', title: 'Perhatian', message: 'Catatan rework wajib diisi bila hasil QC adalah NG.' });
+      return false;
+    }
+    if (stepCode === 'HANDOVER' && String(finishForm.handover_confirmation || '') === 'DISETERIMAKAN' && !String(finishForm.receiver || '').trim()) {
+      showAlert({ type: 'warning', title: 'Perhatian', message: 'Nama penerima wajib diisi saat unit diserahterimakan.' });
       return false;
     }
     return true;
@@ -473,88 +591,147 @@ export default function MechanicProcessScreen() {
     await handleAction('finish');
   };
 
+  const renderChoiceField = (label, value, options, onChange, hint = null) => (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      <View style={styles.segmentRow}>
+        {options.map((option) => {
+          const isActive = value === option.value;
+          return (
+            <TouchableOpacity
+              key={`${label}-${option.value}`}
+              style={[styles.segmentBtn, isActive && styles.segmentBtnActive]}
+              onPress={() => onChange(option.value)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const renderQuickPickField = (label, value, options, onChange, hint = null) => (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      <View style={styles.segmentRow}>
+        {options.map((option) => {
+          const isActive = value === option;
+          return (
+            <TouchableOpacity
+              key={`${label}-${option}`}
+              style={[styles.segmentBtn, isActive && styles.segmentBtnActive]}
+              onPress={() => onChange(option)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>{option}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   const renderFinishFormContent = () => {
     const stepCode = STEP_CODES[currentStepIndex];
     if (stepCode === 'WASHING_BAY') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Kondisi sebelum cuci (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.pre_wash_condition} onChangeText={(v) => setFinishForm((p) => ({ ...p, pre_wash_condition: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Kondisi sesudah cuci (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.post_wash_condition} onChangeText={(v) => setFinishForm((p) => ({ ...p, post_wash_condition: v }))} />
-          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan visual (opsional)" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.visual_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, visual_note: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Kondisi sebelum cuci', finishForm.pre_wash_condition, WASH_PRE_CONDITION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, pre_wash_condition: v })), 'Pilih tingkat kekotoran unit sebelum masuk washing bay.')}
+          {renderChoiceField('Kondisi sesudah cuci', finishForm.post_wash_condition, WASH_POST_CONDITION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, post_wash_condition: v })), 'Gunakan Cuci Ulang bila hasil belum memenuhi standar.')}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan visual / temuan cucian" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.visual_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, visual_note: v }))} />
         </>
       );
     }
     if (stepCode === 'INSPECTION_PKB') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Hasil inspeksi (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.inspection_result} onChangeText={(v) => setFinishForm((p) => ({ ...p, inspection_result: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Rencana pekerjaan (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.work_plan} onChangeText={(v) => setFinishForm((p) => ({ ...p, work_plan: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Temuan utama (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.main_findings} onChangeText={(v) => setFinishForm((p) => ({ ...p, main_findings: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Estimasi tindakan (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.action_estimate} onChangeText={(v) => setFinishForm((p) => ({ ...p, action_estimate: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Hasil inspeksi', finishForm.inspection_result, INSPECTION_RESULT_OPTIONS, (v) => setFinishForm((p) => ({ ...p, inspection_result: v })), 'Gunakan hasil inspeksi terstruktur agar mudah dianalisis.')}
+          {renderChoiceField('Rencana pekerjaan', finishForm.work_plan, WORK_PLAN_OPTIONS, (v) => setFinishForm((p) => ({ ...p, work_plan: v })))}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Temuan utama / ringkasan abnormality" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.main_findings} onChangeText={(v) => setFinishForm((p) => ({ ...p, main_findings: v }))} />
+          <TextInput style={styles.modalInput} placeholder="Estimasi tindakan / SLA" placeholderTextColor={theme.colors.textSecondary} value={finishForm.action_estimate} onChangeText={(v) => setFinishForm((p) => ({ ...p, action_estimate: v }))} />
         </>
       );
     }
     if (stepCode === 'CHECKING') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Checkpoint hasil cek (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.checkpoint_result} onChangeText={(v) => setFinishForm((p) => ({ ...p, checkpoint_result: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Summary engine/hydraulic/body/safety (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.checking_summary} onChangeText={(v) => setFinishForm((p) => ({ ...p, checking_summary: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Status layak lanjut (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.proceed_status} onChangeText={(v) => setFinishForm((p) => ({ ...p, proceed_status: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Hasil checkpoint', finishForm.checkpoint_result, OK_NG_OPTIONS, (v) => setFinishForm((p) => ({ ...p, checkpoint_result: v })), 'Pilih OK jika unit lolos checkpoint, NG jika ada temuan lanjut.')}
+          {renderChoiceField('Status lanjut', finishForm.proceed_status, PROCEED_STATUS_OPTIONS, (v) => setFinishForm((p) => ({ ...p, proceed_status: v })))}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Ringkasan temuan checking" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.checking_summary} onChangeText={(v) => setFinishForm((p) => ({ ...p, checking_summary: v }))} />
         </>
       );
     }
     if (stepCode === 'WAITING_BAY') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Alasan menunggu (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.waiting_reason} onChangeText={(v) => setFinishForm((p) => ({ ...p, waiting_reason: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Menunggu part/slot/approval (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.waiting_type} onChangeText={(v) => setFinishForm((p) => ({ ...p, waiting_type: v }))} />
-          <TextInput style={styles.modalInput} placeholder="ETA (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.waiting_eta} onChangeText={(v) => setFinishForm((p) => ({ ...p, waiting_eta: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Jenis waiting', finishForm.waiting_type, WAITING_TYPE_OPTIONS, (v) => setFinishForm((p) => ({ ...p, waiting_type: v })), 'Pilih penyebab utama mengapa unit masuk waiting bay.')}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Alasan menunggu / detail kendala" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.waiting_reason} onChangeText={(v) => setFinishForm((p) => ({ ...p, waiting_reason: v }))} />
+          {renderQuickPickField('ETA cepat', finishForm.waiting_eta, WAITING_ETA_OPTIONS, (v) => setFinishForm((p) => ({ ...p, waiting_eta: v })), 'Pilih ETA umum untuk mempercepat input.')}
+          <TextInput style={styles.modalInput} placeholder="ETA (contoh: 30 menit / 1 jam)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.waiting_eta} onChangeText={(v) => setFinishForm((p) => ({ ...p, waiting_eta: v }))} />
         </>
       );
     }
     if (stepCode === 'CREATE_WO') {
       return (
         <>
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
           <TextInput style={styles.modalInput} placeholder="SAP Reference No / WO No (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.sap_reference_no} onChangeText={(v) => setFinishForm((p) => ({ ...p, sap_reference_no: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Catatan administrasi (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.admin_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, admin_note: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Konfirmasi jobcard (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.jobcard_confirmation} onChangeText={(v) => setFinishForm((p) => ({ ...p, jobcard_confirmation: v }))} />
+          {renderChoiceField('Konfirmasi jobcard', finishForm.jobcard_confirmation, JOBCARD_CONFIRMATION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, jobcard_confirmation: v })))}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan administrasi" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.admin_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, admin_note: v }))} />
         </>
       );
     }
     if (stepCode === 'REPAIR') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Aksi perbaikan (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.repair_action} onChangeText={(v) => setFinishForm((p) => ({ ...p, repair_action: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Tindakan teknis (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.technical_action} onChangeText={(v) => setFinishForm((p) => ({ ...p, technical_action: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Kendala (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.obstacle} onChangeText={(v) => setFinishForm((p) => ({ ...p, obstacle: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Hold reason bila ada (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.hold_reason} onChangeText={(v) => setFinishForm((p) => ({ ...p, hold_reason: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Aksi perbaikan (wajib)" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.repair_action} onChangeText={(v) => setFinishForm((p) => ({ ...p, repair_action: v }))} />
+          {renderChoiceField('Tindakan teknis', finishForm.technical_action, REPAIR_TECH_ACTION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, technical_action: v })))}
+          {renderChoiceField('Kendala perbaikan', finishForm.obstacle, REPAIR_OBSTACLE_OPTIONS, (v) => setFinishForm((p) => ({ ...p, obstacle: v })))}
+          {['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'].includes(String(finishForm.obstacle || '').toUpperCase()) ? (
+            <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Detail kendala / hold reason" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.hold_reason} onChangeText={(v) => setFinishForm((p) => ({ ...p, hold_reason: v }))} />
+          ) : null}
         </>
       );
     }
     if (stepCode === 'QC') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Hasil QC: OK / NOT_OK (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.qc_result} onChangeText={(v) => setFinishForm((p) => ({ ...p, qc_result: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Parameter QC (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.qc_parameter} onChangeText={(v) => setFinishForm((p) => ({ ...p, qc_parameter: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Catatan rework jika NOT_OK (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.rework_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, rework_note: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Hasil QC', finishForm.qc_result, OK_NG_OPTIONS, (v) => setFinishForm((p) => ({ ...p, qc_result: v })), 'Pilih NG bila unit harus rework.')}
+          {renderQuickPickField('Parameter QC cepat', finishForm.qc_parameter, QC_PARAMETER_OPTIONS, (v) => setFinishForm((p) => ({ ...p, qc_parameter: v })), 'Tap salah satu area bila parameter QC sesuai.')}
+          <TextInput style={styles.modalInput} placeholder="Parameter QC / area cek" placeholderTextColor={theme.colors.textSecondary} value={finishForm.qc_parameter} onChangeText={(v) => setFinishForm((p) => ({ ...p, qc_parameter: v }))} />
+          {String(finishForm.qc_result || '').toUpperCase() === 'NG' ? (
+            <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan rework (wajib bila NG)" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.rework_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, rework_note: v }))} />
+          ) : null}
         </>
       );
     }
     if (stepCode === 'READY_BAY_CLOSE') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Status closing (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.closing_status} onChangeText={(v) => setFinishForm((p) => ({ ...p, closing_status: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Ringkasan pekerjaan (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.work_summary} onChangeText={(v) => setFinishForm((p) => ({ ...p, work_summary: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Kelengkapan dokumen (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.document_completeness} onChangeText={(v) => setFinishForm((p) => ({ ...p, document_completeness: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Status closing', finishForm.closing_status, CLOSING_STATUS_OPTIONS, (v) => setFinishForm((p) => ({ ...p, closing_status: v })))}
+          {renderChoiceField('Kelengkapan dokumen', finishForm.document_completeness, DOCUMENT_COMPLETENESS_OPTIONS, (v) => setFinishForm((p) => ({ ...p, document_completeness: v })))}
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Ringkasan pekerjaan / closing note" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.work_summary} onChangeText={(v) => setFinishForm((p) => ({ ...p, work_summary: v }))} />
         </>
       );
     }
     if (stepCode === 'HANDOVER') {
       return (
         <>
-          <TextInput style={styles.modalInput} placeholder="Konfirmasi serah terima (wajib)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.handover_confirmation} onChangeText={(v) => setFinishForm((p) => ({ ...p, handover_confirmation: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Penerima (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.receiver} onChangeText={(v) => setFinishForm((p) => ({ ...p, receiver: v }))} />
-          <TextInput style={styles.modalInput} placeholder="Catatan akhir (opsional)" placeholderTextColor={theme.colors.textSecondary} value={finishForm.final_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, final_note: v }))} />
+          <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
+          {renderChoiceField('Konfirmasi serah terima', finishForm.handover_confirmation, HANDOVER_CONFIRMATION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, handover_confirmation: v })))}
+          <TextInput style={styles.modalInput} placeholder="Penerima" placeholderTextColor={theme.colors.textSecondary} value={finishForm.receiver} onChangeText={(v) => setFinishForm((p) => ({ ...p, receiver: v }))} />
+          <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan akhir / handover note" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.final_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, final_note: v }))} />
         </>
       );
     }
@@ -1149,6 +1326,26 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: theme.colors.primary,
+  },
+  fieldBlock: {
+    marginBottom: 10,
+  },
+  fieldLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  fieldHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  modalHelperText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   finishModalOverlay: {
     flex: 1,

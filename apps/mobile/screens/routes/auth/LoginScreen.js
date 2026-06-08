@@ -49,7 +49,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <Input
             label="Email / Username"
-            placeholder="operator1 atau operator1@ywa.local"
+            placeholder="operator1@ywa.local"
             value={loginId}
             onChangeText={setLoginId}
             keyboardType="default"

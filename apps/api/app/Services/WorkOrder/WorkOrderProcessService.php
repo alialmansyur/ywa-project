@@ -472,13 +472,15 @@ class WorkOrderProcessService
         $totalActual = (int) $steps->sum('actual_minutes');
         $totalDowntime = (int) $steps->sum('downtime_minutes');
         $lateSteps = $steps->filter(fn ($row) => $row->est_minutes && $row->actual_minutes && $row->actual_minutes > $row->est_minutes)->count();
+        $totalSlaGap = $totalActual - $totalEst;
 
         return [
             'total_est_minutes' => $totalEst,
             'total_actual_minutes' => $totalActual,
+            'total_sla_gap_minutes' => $totalSlaGap,
             'total_downtime_minutes' => $totalDowntime,
             'late_steps' => $lateSteps,
-            'variance_minutes' => $totalActual - $totalEst,
+            'variance_minutes' => $totalSlaGap,
         ];
     }
 
@@ -553,6 +555,96 @@ class WorkOrderProcessService
         $hasNotes = filled($notes);
         $hasStationData = ! empty($stationData);
         abort_if(! $hasNotes && ! $hasStationData, 422, 'Feedback/catatan station wajib diisi sebelum menyelesaikan tahap ini.');
+
+        if (empty($stationData)) {
+            return;
+        }
+
+        $value = static fn (string $key): string => trim((string) ($stationData[$key] ?? ''));
+        $require = static function (string $key, string $message) use ($value): void {
+            abort_if($value($key) === '', 422, $message);
+        };
+        $ensureIn = static function (string $key, array $allowed, string $message) use ($value): void {
+            $current = $value($key);
+            if ($current === '') {
+                return;
+            }
+            abort_if(! in_array($current, $allowed, true), 422, $message);
+        };
+
+        switch ($stepCode) {
+            case 'WASHING_BAY':
+                $require('pre_wash_condition', 'Kondisi sebelum cuci wajib dipilih.');
+                $require('post_wash_condition', 'Kondisi sesudah cuci wajib dipilih.');
+                $ensureIn('pre_wash_condition', ['RINGAN', 'SEDANG', 'BERAT'], 'Kondisi sebelum cuci tidak valid.');
+                $ensureIn('post_wash_condition', ['OK', 'REWASH'], 'Kondisi sesudah cuci tidak valid.');
+                if ($value('post_wash_condition') === 'REWASH') {
+                    $require('visual_note', 'Catatan visual wajib diisi bila hasil cuci perlu diulang.');
+                }
+                break;
+
+            case 'INSPECTION_PKB':
+                $require('inspection_result', 'Hasil inspeksi wajib dipilih.');
+                $require('work_plan', 'Rencana pekerjaan wajib dipilih.');
+                $ensureIn('inspection_result', ['NORMAL', 'ABNORMAL', 'FOLLOW_UP'], 'Hasil inspeksi tidak valid.');
+                $ensureIn('work_plan', ['LANJUT_CHECKING', 'LANJUT_REPAIR', 'MENUNGGU_APPROVAL'], 'Rencana pekerjaan tidak valid.');
+                break;
+
+            case 'CHECKING':
+                $require('checkpoint_result', 'Hasil checkpoint wajib dipilih.');
+                $require('proceed_status', 'Status lanjut wajib dipilih.');
+                $ensureIn('checkpoint_result', ['OK', 'NG'], 'Hasil checkpoint tidak valid.');
+                $ensureIn('proceed_status', ['LANJUT_REPAIR', 'MENUNGGU_PART', 'TIDAK_LANJUT'], 'Status lanjut tidak valid.');
+                if ($value('checkpoint_result') === 'NG') {
+                    $require('checking_summary', 'Ringkasan temuan wajib diisi bila hasil checking NG.');
+                }
+                break;
+
+            case 'WAITING_BAY':
+                $require('waiting_reason', 'Alasan menunggu wajib diisi.');
+                $require('waiting_type', 'Jenis waiting wajib dipilih.');
+                $ensureIn('waiting_type', ['PART', 'SLOT_BAY', 'APPROVAL', 'TOOL', 'EXTERNAL'], 'Jenis waiting tidak valid.');
+                break;
+
+            case 'CREATE_WO':
+                $require('sap_reference_no', 'SAP Reference No / WO No wajib diisi.');
+                $require('jobcard_confirmation', 'Konfirmasi jobcard wajib dipilih.');
+                $ensureIn('jobcard_confirmation', ['SUDAH_CETAK', 'BELUM_CETAK'], 'Konfirmasi jobcard tidak valid.');
+                break;
+
+            case 'REPAIR':
+                $require('repair_action', 'Aksi perbaikan wajib diisi.');
+                $ensureIn('technical_action', ['ADJUSTMENT', 'REPAIR', 'REPLACE', 'CLEANING'], 'Tindakan teknis tidak valid.');
+                $ensureIn('obstacle', ['TIDAK_ADA', 'PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'], 'Kendala perbaikan tidak valid.');
+                if (in_array($value('obstacle'), ['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'], true)) {
+                    $require('hold_reason', 'Detail kendala wajib diisi bila repair mengalami obstacle.');
+                }
+                break;
+
+            case 'QC':
+                $require('qc_result', 'Hasil QC wajib dipilih.');
+                $require('qc_parameter', 'Parameter QC wajib diisi.');
+                $ensureIn('qc_result', ['OK', 'NG'], 'Hasil QC tidak valid.');
+                if ($value('qc_result') === 'NG') {
+                    $require('rework_note', 'Catatan rework wajib diisi bila hasil QC NG.');
+                }
+                break;
+
+            case 'READY_BAY_CLOSE':
+                $require('closing_status', 'Status closing wajib dipilih.');
+                $require('document_completeness', 'Kelengkapan dokumen wajib dipilih.');
+                $ensureIn('closing_status', ['READY_CLOSE', 'PENDING_CLOSE'], 'Status closing tidak valid.');
+                $ensureIn('document_completeness', ['LENGKAP', 'BELUM_LENGKAP'], 'Kelengkapan dokumen tidak valid.');
+                break;
+
+            case 'HANDOVER':
+                $require('handover_confirmation', 'Konfirmasi serah terima wajib dipilih.');
+                $ensureIn('handover_confirmation', ['DISETERIMAKAN', 'DITUNDA'], 'Konfirmasi serah terima tidak valid.');
+                if ($value('handover_confirmation') === 'DISETERIMAKAN') {
+                    $require('receiver', 'Nama penerima wajib diisi saat unit diserahterimakan.');
+                }
+                break;
+        }
     }
 
     private function reservePartsForWorkOrder(WorkOrder $workOrder, User $actor, array $partItems): void

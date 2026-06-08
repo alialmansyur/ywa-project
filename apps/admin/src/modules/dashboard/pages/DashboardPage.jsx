@@ -73,7 +73,7 @@ export function DashboardPage() {
   const [overview, setOverview] = useState(null)
   const [woStatus, setWoStatus] = useState([])
   const [woPriority, setWoPriority] = useState([])
-  const [downtimeTrend, setDowntimeTrend] = useState({ labels: [], series: [] })
+  const [slaGapTrend, setSlaGapTrend] = useState({ labels: [], series: [], actualSeries: [], slaSeries: [], reportedDowntimeSeries: [] })
   const [upcoming, setUpcoming] = useState([])
   const [assetStatus, setAssetStatus] = useState([])
   const [activities, setActivities] = useState([])
@@ -104,11 +104,20 @@ export function DashboardPage() {
       setOverview(ov)
       setWoStatus(Array.isArray(wo?.items) ? wo.items : [])
       setWoPriority(Array.isArray(woPrio?.items) ? woPrio.items : [])
-      setDowntimeTrend({
+      setSlaGapTrend({
         labels: Array.isArray(dtTrend?.labels) ? dtTrend.labels : [],
         series: Array.isArray(dtTrend?.series) ? dtTrend.series : [],
+        actualSeries: Array.isArray(dtTrend?.actual_series) ? dtTrend.actual_series : [],
+        slaSeries: Array.isArray(dtTrend?.sla_series) ? dtTrend.sla_series : [],
+        reportedDowntimeSeries: Array.isArray(dtTrend?.reported_downtime_series) ? dtTrend.reported_downtime_series : [],
       })
-      setUpcoming(Array.isArray(sch?.data) ? sch.data : [])
+      setUpcoming(
+        Array.isArray(sch?.schedules)
+          ? sch.schedules
+          : Array.isArray(sch?.data)
+            ? sch.data
+            : []
+      )
       setAssetStatus(Array.isArray(asset?.items) ? asset.items : [])
       setActivities(Array.isArray(act?.data) ? act.data : [])
       setWorkshopOverview(wsOv || null)
@@ -147,7 +156,7 @@ export function DashboardPage() {
   const woPrioritySeries = woPriority.map((x) => x.total)
   const dueSoonCount = upcoming.filter((s) => typeof s.days_left === 'number' && s.days_left <= 2).length
   const overdueCount = upcoming.filter((s) => typeof s.days_left === 'number' && s.days_left < 0).length
-  const topBottlenecks = workshopBottlenecks?.top_by_downtime || []
+  const topBottlenecks = workshopBottlenecks?.top_by_sla_gap || workshopBottlenecks?.top_by_downtime || []
   const showSkeleton = !hasLoaded
 
   return (
@@ -155,7 +164,7 @@ export function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">Dashboard Workshop</h2>
-          <p className="text-sm text-slate-400">Monitoring work order, prioritas pekerjaan, dan tren downtime pada periode terpilih.</p>
+          <p className="text-sm text-slate-400">Monitoring work order, prioritas pekerjaan, dan tren SLA gap pada periode terpilih.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -286,17 +295,21 @@ export function DashboardPage() {
           </div>
 
           <div className="mt-4 pt-4 border-t border-slate-700/70">
-            <div className="text-xs text-slate-400 mb-2">Trend Downtime Minutes</div>
+            <div className="text-xs text-slate-400 mb-2">Trend SLA Gap Minutes</div>
             <Chart
               type="line"
               height={180}
-              series={[{ name: 'Downtime (menit)', data: downtimeTrend.series }]}
+              series={[
+                { name: 'SLA Gap (menit)', data: slaGapTrend.series },
+                { name: 'Actual (menit)', data: slaGapTrend.actualSeries },
+                { name: 'SLA (menit)', data: slaGapTrend.slaSeries },
+              ]}
               options={{
                 chart: { background: 'transparent', toolbar: { show: false } },
-                xaxis: { categories: downtimeTrend.labels, labels: { style: { colors: '#94a3b8', fontSize: '10px' } } },
+                xaxis: { categories: slaGapTrend.labels, labels: { style: { colors: '#94a3b8', fontSize: '10px' } } },
                 yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '10px' } } },
                 stroke: { curve: 'smooth', width: 2 },
-                colors: ['#38bdf8'],
+                colors: ['#38bdf8', '#f59e0b', '#22c55e'],
                 grid: { borderColor: 'rgba(255,255,255,0.08)' },
                 dataLabels: { enabled: false },
                 theme: { mode: 'dark' },
@@ -322,7 +335,7 @@ export function DashboardPage() {
             <div className="flex items-center justify-between"><span className="text-slate-400">WO Berjalan</span><span className="font-semibold text-white">{workshopOverview?.active_wo ?? 0}</span></div>
             <div className="flex items-center justify-between"><span className="text-slate-400">WO On Hold</span><span className="font-semibold text-yellow-300">{workshopOverview?.hold_wo ?? 0}</span></div>
             <div className="flex items-center justify-between"><span className="text-slate-400">Step Terlambat</span><span className="font-semibold text-red-300">{workshopOverview?.late_steps ?? 0}</span></div>
-            <div className="flex items-center justify-between"><span className="text-slate-400">Downtime Hari Ini</span><span className="font-semibold text-white">{workshopOverview?.total_downtime_today ?? 0}m</span></div>
+            <div className="flex items-center justify-between"><span className="text-slate-400">SLA Gap Hari Ini</span><span className="font-semibold text-white">{workshopOverview?.total_sla_gap_today ?? workshopOverview?.total_downtime_today ?? 0}m</span></div>
           </div>
           <div className="mt-4 pt-4 border-t border-slate-700/70">
             <h4 className="text-xs text-slate-400 mb-2">Top Bottleneck</h4>
@@ -330,7 +343,7 @@ export function DashboardPage() {
               {topBottlenecks.slice(0, 3).map((row) => (
                 <div key={row.step_code} className="text-xs border border-slate-700 rounded p-2">
                   <div className="text-slate-300">{humanizeLabel(row.step_code)}</div>
-                  <div className="text-slate-500 mt-1">Downtime {Number(row.total_downtime_minutes || 0)} menit</div>
+                  <div className="text-slate-500 mt-1">SLA Gap {Number(row.total_sla_gap_minutes ?? row.total_downtime_minutes ?? 0)} menit</div>
                 </div>
               ))}
               {!loading && topBottlenecks.length === 0 ? <div className="text-xs text-slate-500">Belum ada data bottleneck.</div> : null}

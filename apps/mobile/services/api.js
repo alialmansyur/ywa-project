@@ -1,6 +1,6 @@
 import { create } from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { API_CONFIG } from '../constants/config';
+import * as storage from '../utils/storage';
 
 const ERROR_MESSAGES = {
   NETWORK_UNREACHABLE: 'Tidak dapat terhubung ke server. Periksa koneksi internet atau host API.',
@@ -55,7 +55,7 @@ const apiClient = create({
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      const token = await SecureStore.getItemAsync('auth_token');
+      const token = await storage.getItemAsync('auth_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -72,7 +72,8 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       try {
-        await SecureStore.deleteItemAsync('auth_token');
+        await storage.deleteItemAsync('auth_token');
+        await storage.deleteItemAsync('push_token');
         const { useAuthStore } = require('../stores/auth.store');
         useAuthStore.getState().forceLoggedOut();
       } catch (e) {

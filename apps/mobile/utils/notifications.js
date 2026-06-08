@@ -3,17 +3,34 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-// Konfigurasi handler agar notifikasi muncul saat app sedang aktif (foreground)
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+const isExpoGo =
+  Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
+const NOTIFICATION_HANDLER_FLAG = '__tapgNotificationHandlerConfigured';
+
+export const configureNotificationHandler = () => {
+  if (globalThis[NOTIFICATION_HANDLER_FLAG]) {
+    return;
+  }
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+
+  globalThis[NOTIFICATION_HANDLER_FLAG] = true;
+};
 
 export const setupPushNotifications = async () => {
   let token;
+
+  if (isExpoGo) {
+    console.log('Skipping remote push token registration in Expo Go (Android SDK 53+ unsupported).');
+    return null;
+  }
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -25,11 +42,6 @@ export const setupPushNotifications = async () => {
   }
 
   if (Device.isDevice) {
-    if (Constants.appOwnership === 'expo') {
-      console.log('Skipping remote push token registration (Unsupported in Expo Go SDK 53+)');
-      return null;
-    }
-
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {

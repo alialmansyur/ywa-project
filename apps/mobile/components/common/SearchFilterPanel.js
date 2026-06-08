@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Modal } from 'react-native';
 import { Search, Calendar, X } from 'lucide-react-native';
 import { theme } from '../../constants/AppTheme';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 export function SearchFilterPanel({ 
   onSearch, 
@@ -16,26 +16,46 @@ export function SearchFilterPanel({
   
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState('from'); // 'from' or 'to'
+  const [iosPickerDate, setIosPickerDate] = useState(new Date());
 
   const handleSearchChange = (text) => {
     setSearch(text);
     if (onSearch) onSearch(text);
   };
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      if (pickerMode === 'from') {
-        setFromDate(selectedDate);
-      } else {
-        setToDate(selectedDate);
-      }
-    }
-  };
-
   const openPicker = (mode) => {
     setPickerMode(mode);
+    const initialDate = (mode === 'from' ? fromDate : toDate) || new Date();
+
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: initialDate,
+        mode: 'date',
+        display: 'default',
+        onChange: (event, selectedDate) => {
+          if (event?.type !== 'set' || !selectedDate) return;
+          if (mode === 'from') {
+            setFromDate(selectedDate);
+          } else {
+            setToDate(selectedDate);
+          }
+        },
+        maximumDate: new Date(),
+      });
+      return;
+    }
+
+    setIosPickerDate(initialDate);
     setShowPicker(true);
+  };
+
+  const confirmIosPicker = () => {
+    if (pickerMode === 'from') {
+      setFromDate(iosPickerDate);
+    } else {
+      setToDate(iosPickerDate);
+    }
+    setShowPicker(false);
   };
 
   const applyFilter = () => {
@@ -109,15 +129,40 @@ export function SearchFilterPanel({
         )}
       </View>
 
-      {showPicker && (
-        <DateTimePicker
-          value={(pickerMode === 'from' ? fromDate : toDate) || new Date()}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-        />
-      )}
+      {Platform.OS === 'ios' ? (
+        <Modal
+          visible={showPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => setShowPicker(false)}>
+                  <Text style={styles.modalActionText}>Batal</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>
+                  {pickerMode === 'from' ? 'Pilih Tanggal Mulai' : 'Pilih Tanggal Akhir'}
+                </Text>
+                <TouchableOpacity onPress={confirmIosPicker}>
+                  <Text style={styles.modalActionText}>Pilih</Text>
+                </TouchableOpacity>
+              </View>
+
+              <DateTimePicker
+                value={iosPickerDate}
+                mode="date"
+                display="spinner"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) setIosPickerDate(selectedDate);
+                }}
+                maximumDate={new Date()}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -199,5 +244,36 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     fontWeight: 'bold',
     color: theme.colors.text,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalTitle: {
+    ...theme.typography.caption,
+    color: theme.colors.text,
+    fontWeight: '700',
+  },
+  modalActionText: {
+    ...theme.typography.caption,
+    color: theme.colors.primary,
+    fontWeight: '700',
   },
 });

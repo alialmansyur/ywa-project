@@ -748,7 +748,7 @@ export function AssetDetailPage() {
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           <div className="card p-4">
-            <div className="text-xs text-slate-500">Downtime Total</div>
+            <div className="text-xs text-slate-500">Asset Downtime Total</div>
             <div className="text-xl font-semibold text-yellow-300 mt-1">{totalDowntimeHours.toLocaleString('id-ID')} jam</div>
           </div>
           <div className="card p-4">
@@ -996,7 +996,7 @@ export function AssetDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-4"><div className="text-xs text-slate-500">Total Cost</div><div className="text-lg font-bold text-emerald-300">Rp {totalCost.toLocaleString('id-ID')}</div></div>
             <div className="card p-4"><div className="text-xs text-slate-500">Total Job</div><div className="text-lg font-bold text-blue-300">{workshopHistory.length}</div></div>
-            <div className="card p-4"><div className="text-xs text-slate-500">Avg Downtime</div><div className="text-lg font-bold text-yellow-300">{averageDowntimeHours.toLocaleString('id-ID')} jam</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-500">Avg Asset Downtime</div><div className="text-lg font-bold text-yellow-300">{averageDowntimeHours.toLocaleString('id-ID')} jam</div></div>
           </div>
 
           <div className="card overflow-hidden">

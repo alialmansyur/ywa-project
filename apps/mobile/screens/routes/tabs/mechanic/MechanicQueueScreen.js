@@ -299,23 +299,28 @@ export default function MechanicHub() {
     return h > 0 ? `${h}j ${m}m` : `${m}m`;
   }, [queueData]);
 
-  const filteredQueue = queueData
-    .filter((item) => (activeFilter === 'Semua' ? true : item.priority === activeFilter))
-    .sort((a, b) => {
-      if (a.priority === 'Kritis' && b.priority !== 'Kritis') return -1;
-      if (a.priority !== 'Kritis' && b.priority === 'Kritis') return 1;
-      return 0;
-    });
-  const filteredHistory = historyData.filter((item) => {
-    const kw = String(historyFilter.search || '').toLowerCase();
-    const dateValue = String(item.createdAt || '').slice(0, 10);
-    const inSearch = !kw || [item.code, item.unit, item.unitName, item.plateNo, item.issue].some((x) => String(x || '').toLowerCase().includes(kw));
-    const inFrom = !historyFilter.from || dateValue >= historyFilter.from;
-    const inTo = !historyFilter.to || dateValue <= historyFilter.to;
-    return inSearch && inFrom && inTo;
-  });
+  const filteredQueue = useMemo(() => {
+    return [...queueData]
+      .filter((item) => (activeFilter === 'Semua' ? true : item.priority === activeFilter))
+      .sort((a, b) => {
+        if (a.priority === 'Kritis' && b.priority !== 'Kritis') return -1;
+        if (a.priority !== 'Kritis' && b.priority === 'Kritis') return 1;
+        return 0;
+      });
+  }, [activeFilter, queueData]);
 
-  const renderQueueItem = ({ item }) => (
+  const filteredHistory = useMemo(() => {
+    return historyData.filter((item) => {
+      const kw = String(historyFilter.search || '').toLowerCase();
+      const dateValue = String(item.createdAt || '').slice(0, 10);
+      const inSearch = !kw || [item.code, item.unit, item.unitName, item.plateNo, item.issue].some((x) => String(x || '').toLowerCase().includes(kw));
+      const inFrom = !historyFilter.from || dateValue >= historyFilter.from;
+      const inTo = !historyFilter.to || dateValue <= historyFilter.to;
+      return inSearch && inFrom && inTo;
+    });
+  }, [historyData, historyFilter]);
+
+  const renderQueueItem = useCallback(({ item }) => (
     <Card style={[styles.queueCard, item.priority === 'Kritis' && styles.queueCardUrgent]}>
       <View style={styles.qHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -364,9 +369,21 @@ export default function MechanicHub() {
         </View>
       </View>
     </Card>
+  ), [activeTab]);
+
+  const historyListHeader = useMemo(() => (
+    <SearchFilterPanel
+      placeholder="Cari riwayat pekerjaan..."
+      onFilter={(f) => setHistoryFilter((prev) => ({ ...prev, ...f }))}
+    />
+  ), []);
+
+  const refreshControl = useMemo(
+    () => <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />,
+    [onRefresh, refreshing],
   );
 
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />;
+  const keyExtractor = useCallback((item) => String(item.id), []);
 
   return (
     <View style={styles.container}>
@@ -402,11 +419,11 @@ export default function MechanicHub() {
           <Card style={styles.queueCard}><Skeleton height={120} width="100%" /></Card>
         </View>
       ) : activeTab === 'queue' ? (
-        <FlatList data={filteredQueue} keyExtractor={(item, index) => `${item.id}-${index}`} renderItem={renderQueueItem} contentContainerStyle={styles.list} refreshControl={refreshControl} />
+        <FlatList data={filteredQueue} keyExtractor={keyExtractor} renderItem={renderQueueItem} contentContainerStyle={styles.list} refreshControl={refreshControl} />
       ) : activeTab === 'approval' ? (
         <FlatList
           data={approvalData}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
+          keyExtractor={keyExtractor}
           renderItem={renderQueueItem}
           contentContainerStyle={styles.list}
           refreshControl={refreshControl}
@@ -415,11 +432,11 @@ export default function MechanicHub() {
       ) : (
         <FlatList
           data={filteredHistory}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
+          keyExtractor={keyExtractor}
           renderItem={renderQueueItem}
           contentContainerStyle={styles.list}
           refreshControl={refreshControl}
-          ListHeaderComponent={<SearchFilterPanel placeholder="Cari riwayat pekerjaan..." onFilter={(f) => setHistoryFilter((prev) => ({ ...prev, ...f }))} />}
+          ListHeaderComponent={historyListHeader}
           ListEmptyComponent={<View style={styles.emptyBox}><CheckCircle2 size={40} color={theme.colors.border} /><Text style={styles.emptyText}>Belum ada riwayat pengerjaan hari ini.</Text></View>}
         />
       )}

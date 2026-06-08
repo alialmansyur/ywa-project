@@ -146,7 +146,7 @@ export function AppRouter() {
       <Route path="/reports/wo-history" element={<ProtectedByMenu authenticated={authenticated} routePath="/reports/wo-history">{withLayout('WO History', <WoHistoryReportPage />)}</ProtectedByMenu>} />
       <Route path="/reports/workshop-step-control" element={<ProtectedByMenu authenticated={authenticated} routePath="/reports/workshop-step-control">{withLayout('Workshop Step Control', <WorkshopStepControlReportPage />)}</ProtectedByMenu>} />
       <Route path="/reports/service-history" element={<ProtectedByMenu authenticated={authenticated} routePath="/reports/service-history">{withLayout('Service History', <ServiceHistoryReportPage />)}</ProtectedByMenu>} />
-      <Route path="/reports/downtime-analysis" element={<ProtectedByMenu authenticated={authenticated} routePath="/reports/downtime-analysis">{withLayout('Downtime Analysis', <DowntimeAnalysisReportPage />)}</ProtectedByMenu>} />
+      <Route path="/reports/downtime-analysis" element={<ProtectedByMenu authenticated={authenticated} routePath="/reports/downtime-analysis">{withLayout('Downtime Comparison', <DowntimeAnalysisReportPage />)}</ProtectedByMenu>} />
 
       <Route path="/monitoring" element={<ProtectedByMenu authenticated={authenticated} routePath="/monitoring">{withLayout('Monitoring', <MonitoringPage />)}</ProtectedByMenu>} />
       <Route path="/users" element={<ProtectedByMenu authenticated={authenticated} routePath="/users">{withLayout('User Management', <UsersPage />)}</ProtectedByMenu>} />

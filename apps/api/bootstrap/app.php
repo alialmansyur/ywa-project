@@ -44,7 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $retryAfter = (int) ($exception->getHeaders()["Retry-After"] ?? 60);
+            $retryAfter = max(1, (int) ($exception->getHeaders()["Retry-After"] ?? 60));
 
             return response()->json([
                 "message" => "Too Many Attempts. Silakan coba lagi dalam {$retryAfter} detik.",

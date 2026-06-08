@@ -277,6 +277,8 @@ class DashboardService
         $rows = DB::table('wo_process_step_logs')
             ->selectRaw('DATE(updated_at) as date_key')
             ->selectRaw('SUM(COALESCE(downtime_minutes, 0)) as total_downtime_minutes')
+            ->selectRaw('SUM(COALESCE(est_minutes, 0)) as total_sla_minutes')
+            ->selectRaw('SUM(COALESCE(actual_minutes, 0)) as total_actual_minutes')
             ->whereBetween('updated_at', [$from, $to])
             ->groupBy('date_key')
             ->orderBy('date_key')
@@ -285,13 +287,23 @@ class DashboardService
 
         $labels = [];
         $series = [];
+        $slaSeries = [];
+        $actualSeries = [];
+        $reportedDowntimeSeries = [];
         $days = max(1, $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1);
 
         for ($i = 0; $i < $days; $i++) {
             $day = $from->copy()->addDays($i);
             $key = $day->toDateString();
+            $totalSlaMinutes = (int) ($rows[$key]->total_sla_minutes ?? 0);
+            $totalActualMinutes = (int) ($rows[$key]->total_actual_minutes ?? 0);
+            $totalReportedDowntimeMinutes = (int) ($rows[$key]->total_downtime_minutes ?? 0);
+
             $labels[] = $day->format('d M');
-            $series[] = (int) ($rows[$key]->total_downtime_minutes ?? 0);
+            $series[] = $totalActualMinutes - $totalSlaMinutes;
+            $slaSeries[] = $totalSlaMinutes;
+            $actualSeries[] = $totalActualMinutes;
+            $reportedDowntimeSeries[] = $totalReportedDowntimeMinutes;
         }
 
         return [
@@ -299,6 +311,9 @@ class DashboardService
             'to' => $to->toDateString(),
             'labels' => $labels,
             'series' => $series,
+            'sla_series' => $slaSeries,
+            'actual_series' => $actualSeries,
+            'reported_downtime_series' => $reportedDowntimeSeries,
         ];
     }
 
@@ -395,9 +410,11 @@ class DashboardService
             ->values();
 
         return [
+            'upcoming_days' => $days,
             'days' => $days,
             'count' => $rows->count(),
             'data' => $rows,
+            'schedules' => $rows,
         ];
     }
 

@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Models\AppNotification;
 use App\Policies\AppNotificationPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,6 +20,22 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(AppNotification::class, AppNotificationPolicy::class);
+        RateLimiter::for('api-authenticated', function (Request $request) {
+            $userKey = (string) optional($request->user())->getAuthIdentifier();
+            $clientIp = (string) $request->ip();
+            $key = $userKey !== '' ? $userKey : $clientIp;
+            $path = trim($request->path(), '/');
+
+            if ($request->isMethod('GET') && $path === 'api/v1/settings/menu-access') {
+                return Limit::perMinute(1200)->by('menu-access:' . $key);
+            }
+
+            if ($request->isMethod('GET')) {
+                return Limit::perMinute(600)->by('api-read:' . $key);
+            }
+
+            return Limit::perMinute(300)->by('api-write:' . $key);
+        });
 
         try {
             $smtp = \Illuminate\Support\Facades\DB::table('smtp_configurations')
