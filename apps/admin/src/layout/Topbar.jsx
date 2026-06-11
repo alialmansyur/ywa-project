@@ -5,6 +5,8 @@ import { resolveAdminNotificationRoute } from '../utils/notificationRoutes'
 import Swal from 'sweetalert2'
 
 const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
+const DISPLAY_TIME_ZONE = 'Asia/Makassar'
+const DISPLAY_TIME_ZONE_LABEL = 'WITA'
 
 function fmtRelative(iso) {
   if (!iso) return '-'
@@ -104,8 +106,8 @@ export function Topbar({ title, onToggleSidebar }) {
     navigate(route)
   }
 
-  const formattedDate = now.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-  const formattedTime = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const formattedDate = now.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: DISPLAY_TIME_ZONE })
+  const formattedTime = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: DISPLAY_TIME_ZONE })
 
   return (
     <header id="topbar" className="admin-topbar relative z-40 overflow-visible h-[72px] bg-slate-800/60 border-b border-slate-700/50 flex items-center px-6 gap-4 flex-shrink-0 backdrop-blur-sm">
@@ -113,7 +115,7 @@ export function Topbar({ title, onToggleSidebar }) {
       <div className="flex-1 min-w-0"><h1 className="text-xs sm:text-sm font-semibold text-white truncate">{title}</h1></div>
       <div className="hidden lg:flex flex-col text-right leading-tight min-w-[220px]">
         <span className="text-xs text-slate-400 capitalize">{formattedDate}</span>
-        <span className="text-sm text-slate-200 font-semibold tabular-nums">{formattedTime}</span>
+        <span className="text-sm text-slate-200 font-semibold tabular-nums">{formattedTime} {DISPLAY_TIME_ZONE_LABEL}</span>
       </div>
       <button
         onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}

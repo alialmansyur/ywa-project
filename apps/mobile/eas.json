@@ -10,7 +10,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.8:8000/api/v1"
+        "EXPO_PUBLIC_API_BASE_URL": "http://103.247.10.115:8000/api/v1"
       },
       "android": {
         "buildType": "apk"
@@ -22,7 +22,7 @@
     "production": {
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.8:8000/api/v1"
+        "EXPO_PUBLIC_API_BASE_URL": "http://103.247.10.115:8000/api/v1"
       },
       "android": {
         "buildType": "app-bundle"

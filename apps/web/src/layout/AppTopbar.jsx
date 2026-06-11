@@ -1,6 +1,9 @@
+const DISPLAY_TIME_ZONE = 'Asia/Makassar'
+const DISPLAY_TIME_ZONE_LABEL = 'WITA'
+
 export function AppTopbar({ settings, now, lastUpdateAt, connectionStatus, latencyMs }) {
   const lastUpdateText = lastUpdateAt
-    ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeStyle: 'medium', hour12: false }).format(new Date(lastUpdateAt))
+    ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeStyle: 'medium', hour12: false, timeZone: DISPLAY_TIME_ZONE }).format(new Date(lastUpdateAt))
     : '-'
   return (
     <header className="topbar">
@@ -12,7 +15,7 @@ export function AppTopbar({ settings, now, lastUpdateAt, connectionStatus, laten
       </div>
       <div className="topbar-actions topbar-actions-text-only">
         <div className="datetime">
-          <p>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(now)} · {new Intl.DateTimeFormat('id-ID', { timeStyle: 'medium', hour12: false }).format(now)} WIB</p>
+          <p>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeZone: DISPLAY_TIME_ZONE }).format(now)} · {new Intl.DateTimeFormat('id-ID', { timeStyle: 'medium', hour12: false, timeZone: DISPLAY_TIME_ZONE }).format(now)} {DISPLAY_TIME_ZONE_LABEL}</p>
           <p>Update Terakhir: {lastUpdateText} · <span className={`conn-${String(connectionStatus || '').toLowerCase()}`}>{connectionStatus}</span> · {Math.floor((latencyMs || 0) / 1000)}s</p>
         </div>
       </div>
