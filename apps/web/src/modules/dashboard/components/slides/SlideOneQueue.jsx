@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import { elapsedSeconds, fmtElapsed, statusClass, stepCompactLabel, stepNumberFromRow } from '../utils'
 
-export function SlideOneQueue({ settings, queueRows, onRowClick, isLoading, error, now }) {
+export function SlideOneQueue({ settings, towerQ, setTowerQ, queueRows, onRowClick, isLoading, error, now }) {
   const tableWrapRef = useRef(null)
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -60,13 +60,21 @@ export function SlideOneQueue({ settings, queueRows, onRowClick, isLoading, erro
       <section className={isExpanded ? 'queue-panel queue-panel-expanded' : 'queue-panel'}>
         {isLoading ? <div className="panel-feedback panel-feedback-loading">Memuat data queue...</div> : null}
         {error ? <div className="panel-feedback panel-feedback-error">Gagal memuat queue. Coba refresh slide aktif.</div> : null}
+        <div className="queue-toolbar">
+          <input
+            value={towerQ}
+            onChange={(e) => { setTowerQ(e.target.value) }}
+            placeholder="Cari code, io_code, name, WO, SAP, step..."
+            className="mini-input queue-search-input"
+          />
+        </div>
         <div className="table-wrap queue-desktop-table queue-auto-scroll" ref={tableWrapRef}>
           <table>
             <thead>
               <tr>
                 <th>No</th>
-                <th>WO</th>
-                <th>Unit</th>
+                <th>Code</th>
+                <th>Name</th>
                 <th>Step</th>
                 <th>Time In</th>
                 <th>Elapsed</th>
@@ -79,12 +87,12 @@ export function SlideOneQueue({ settings, queueRows, onRowClick, isLoading, erro
                 <tr key={row.wo_id} className="clickable-row" onClick={() => onRowClick(row)}>
                   <td>{idx + 1}</td>
                   <td>
-                    <div className="unit-name">{row.wo_code || '-'}</div>
-                    <div className="unit-sub">{row.sap_reference_no || '-'}</div>
+                    <div className="unit-name">{row.asset_code || row.asset?.code || '-'}</div>
+                    <div className="unit-sub">IO: {row.asset_io_code || row.asset?.io_code || '-'}</div>
                   </td>
                   <td>
                     <div className="unit-name">{row.asset_name || row.asset?.name || '-'}</div>
-                    <div className="unit-sub">{row.asset_code || row.asset?.code || '-'} · {row.police_no || row.license_plate || row.nopol || row.asset?.police_no || row.asset?.license_plate || '-'}</div>
+                    <div className="unit-sub">{row.police_no || row.license_plate || row.nopol || row.asset?.police_no || row.asset?.license_plate || '-'}</div>
                   </td>
                   <td>{stepCompactLabel(row)} (Step {stepNumberFromRow(row)}/11)<br />{row.step_name || '-'}</td>
                   <td>{row.wo_created_at ? new Date(row.wo_created_at).toLocaleTimeString('id-ID', { hour12: false }) : '-'}</td>

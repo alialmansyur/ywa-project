@@ -295,7 +295,7 @@ export function WorkshopControlTowerPage() {
       <div className="card p-3">
         <div className="overflow-x-auto hide-scrollbar">
           <div className="flex items-center gap-2 whitespace-nowrap min-w-max pr-1">
-            <input value={q} onChange={(e) => { setPage(1); setQ(e.target.value) }} placeholder="Cari WO/SAP/asset/step..." className="input px-3 py-2 rounded-lg text-sm w-72 shrink-0" />
+            <input value={q} onChange={(e) => { setPage(1); setQ(e.target.value) }} placeholder="Cari code, SAP, asset code, io_code, nama, step..." className="input px-3 py-2 rounded-lg text-sm w-80 shrink-0" />
             <select value={bay} onChange={(e) => { setPage(1); setBay(e.target.value) }} className="input px-3 py-2 rounded-lg text-sm w-44 shrink-0">
               <option value="all">Semua Bay</option>
               {boardOrder.map((b) => <option key={b} value={b}>{bayLabels[b]}</option>)}
@@ -342,14 +342,13 @@ export function WorkshopControlTowerPage() {
               <div className="space-y-2 min-h-20 max-h-72 overflow-y-auto hide-scrollbar pr-1">
                 {(boardBuckets[b] || []).map((row) => (
                   <button type="button" onClick={() => setSelectedWoId(row.wo_id)} key={`${b}-${row.wo_id}`} className="w-full text-left rounded-lg border border-slate-700 p-2 text-[10px] hover:bg-slate-800/40 space-y-1">
-                    <div className="text-blue-300 font-semibold text-[10px]">{row.wo_code}</div>
-                    <div className="text-slate-200 line-clamp-1 text-[10px]">{normalizeTitle(row.wo_title || row.title)}</div>
-                    <div className="text-slate-500 line-clamp-1 text-[10px]">Asset: {row.asset_code || '-'} · {row.asset_name || '-'}</div>
+                    <div className="text-blue-300 font-semibold text-[10px]">{row.wo_code || '-'}</div>
+                    <div className="text-slate-200 line-clamp-1 text-[10px]">{row.asset_code || '-'} | {row.asset_name || '-'}</div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
-                      <span className="uppercase">{row.wo_type || '-'}</span>
+                      <span className="line-clamp-1">{row.asset_io_code || row.police_no || '-'}</span>
                       <span className={slaClass(row)}>{row.queue_minutes_live || 0}m</span>
                     </div>
-                    <div className={`text-[10px] ${row.sap_reference_no ? 'text-cyan-300' : 'text-slate-500'}`}>{row.sap_reference_no ? `SAP: ${row.sap_reference_no}` : 'SAP belum diisi'}</div>
+                    <div className={`text-[10px] ${row.sap_reference_no ? 'text-cyan-300' : 'text-slate-500'}`}>{row.sap_reference_no ? `SAP: ${row.sap_reference_no}` : (row.step_name || '-')}</div>
                   </button>
                 ))}
                 {(boardBuckets[b] || []).length === 0 ? <div className="h-16 rounded border-2 border-dashed border-slate-700/60 flex items-center justify-center text-xs text-slate-500">Kosong</div> : null}

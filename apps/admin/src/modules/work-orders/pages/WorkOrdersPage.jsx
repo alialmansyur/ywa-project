@@ -275,7 +275,7 @@ export function WorkOrdersPage() {
       <div className="card p-3">
         <div className="overflow-x-auto hide-scrollbar">
           <div className="flex items-center gap-2 whitespace-nowrap min-w-max pr-1">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari WO/SAP/unit/judul..." className="input px-3 py-2 rounded-lg text-sm w-72 shrink-0" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari code, SAP, asset code, io_code, nama unit..." className="input px-3 py-2 rounded-lg text-sm w-80 shrink-0" />
             <select value={statusFilter} onChange={(e) => { setPage(1); setStatusFilter(e.target.value) }} className="input px-3 py-2 rounded-lg text-sm w-44 shrink-0">
               <option value="all">Semua Status</option>
               {Object.keys(statusConfig).map((x) => <option key={x} value={x}>{statusConfig[x].label}</option>)}
@@ -380,14 +380,13 @@ export function WorkOrdersPage() {
                 <div className="space-y-2 max-h-[28rem] overflow-y-auto hide-scrollbar pr-1">
                   {(grouped[status] || []).map((wo) => (
                     <button key={wo.id} type="button" onClick={() => setSelected(wo)} className="w-full text-left rounded-lg border border-slate-700 p-2 text-[11px] hover:bg-slate-800/40 space-y-1">
-                      <div className="text-blue-300 font-semibold text-[11px]">{wo.code}</div>
-                      <div className="text-slate-200 line-clamp-1 text-[11px]">{normalizeTitle(wo.title)}</div>
-                      <div className="text-slate-500 line-clamp-1 text-[10px]">{wo.asset?.code || '-'} · {wo.asset?.name || '-'}</div>
+                      <div className="text-blue-300 font-semibold text-[11px]">{wo.code || '-'}</div>
+                      <div className="text-slate-200 line-clamp-1 text-[11px]">{wo.asset?.code || '-'} | {wo.asset?.name || '-'}</div>
                       <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
                         <span className="uppercase">{wo.type || '-'}</span>
-                        <span className="uppercase">{wo.priority || '-'}</span>
+                        <span className="line-clamp-1">{wo.asset?.io_code || wo.asset?.plate_number || '-'}</span>
                       </div>
-                      <div className={`text-[10px] ${wo.sap_reference_no ? 'text-cyan-300' : 'text-slate-500'}`}>{wo.sap_reference_no ? `SAP: ${wo.sap_reference_no}` : 'SAP belum diisi'}</div>
+                      <div className={`text-[10px] ${wo.sap_reference_no ? 'text-cyan-300' : 'text-slate-500'}`}>{wo.sap_reference_no ? `SAP: ${wo.sap_reference_no}` : (wo.priority || '-').toUpperCase()}</div>
                     </button>
                   ))}
                   {(grouped[status] || []).length === 0 ? <div className="h-20 rounded border-2 border-dashed border-slate-700/60 flex items-center justify-center text-xs text-slate-500">Kosong</div> : null}

@@ -344,7 +344,7 @@ export function P2hPage() {
       {selected ? (
         <ModalPortal>
           <div onClick={() => !reviewLoading && setSelected(null)}>
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-5 border-b border-slate-700">
                 <div>
                   <div className="text-xs text-blue-400 font-mono">{selected.code || `P2H-${selected.id}`}</div>

@@ -76,10 +76,18 @@ class AssetController extends Controller
         $query = Asset::with(['category', 'latestLocation', 'activeAssignment.user:id,name,email'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->category_id, fn ($q) => $q->where('category_id', $request->category_id))
-            ->when($request->search, fn ($q) => $q->where(function ($sq) use ($request) {
-                $sq->where('name', 'like', "%{$request->search}%")
-                    ->orWhere('code', 'like', "%{$request->search}%");
-            }))
+            ->when($request->search, function ($q) use ($request) {
+                $search = (string) $request->search;
+
+                $q->where(function ($sq) use ($search) {
+                    $sq->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhereHas('activeAssignment.user', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->orderBy($request->sort_by ?? 'created_at', $request->sort_dir ?? 'desc');
 
         $assets = $query->paginate($request->per_page ?? 15);

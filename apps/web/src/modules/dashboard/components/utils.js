@@ -85,3 +85,34 @@ export function isActiveWorkshopRow(row) {
   return ACTIVE_WO_STATUSES.includes(status) && !isFinishedRow(row)
 }
 
+export function buildWorkshopSearchText(row) {
+  return [
+    row?.wo_code,
+    row?.sap_reference_no,
+    row?.wo_title,
+    row?.wo_description,
+    row?.asset_code,
+    row?.asset_io_code,
+    row?.asset_name,
+    row?.asset_no,
+    row?.serial_number,
+    row?.license_plate,
+    row?.police_no,
+    row?.nopol,
+    row?.supervisor_name,
+    row?.step_code,
+    row?.step_name,
+    row?.current_bay,
+    row?.asset?.code,
+    row?.asset?.io_code,
+    row?.asset?.name,
+    row?.asset?.asset_no,
+    row?.asset?.serial_number,
+    row?.asset?.license_plate,
+    row?.asset?.police_no,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+

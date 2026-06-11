@@ -1,7 +1,20 @@
 import React from 'react';
 import Select from 'react-select';
 
-export function SearchableSelect({ options, value, onChange, placeholder = 'Pilih...', className = '', disabled = false, isClearable = true }) {
+export function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Pilih...',
+  className = '',
+  disabled = false,
+  isClearable = true,
+  inputValue,
+  onInputChange,
+  isLoading = false,
+  noOptionsMessage,
+  filterOption,
+}) {
   // Custom styles to match the dark theme Tailwind UI
   const customStyles = {
     control: (base, state) => ({
@@ -83,7 +96,11 @@ export function SearchableSelect({ options, value, onChange, placeholder = 'Pili
       className={className}
       isDisabled={disabled}
       isClearable={isClearable}
-      noOptionsMessage={() => "Tidak ada data"}
+      inputValue={inputValue}
+      onInputChange={onInputChange}
+      isLoading={isLoading}
+      noOptionsMessage={noOptionsMessage || (() => "Tidak ada data")}
+      filterOption={filterOption}
     />
   );
 }

@@ -43,7 +43,7 @@ export function SlideTwoControlTower({
       <section className="panel tower-filter-panel">
         <div className="overflow-x-auto hide-scrollbar">
           <div className="tower-filter-grid tower-filter-strip">
-            <input value={towerQ} onChange={(e) => { setTowerQ(e.target.value) }} placeholder="Cari WO/SAP/asset/step..." className="mini-input" />
+            <input value={towerQ} onChange={(e) => { setTowerQ(e.target.value) }} placeholder="Cari code, io_code, name, WO, SAP, step..." className="mini-input" />
             <select value={towerBay} onChange={(e) => { setTowerBay(e.target.value) }} className="mini-input">
               <option value="all">Semua Bay</option>
               {boardColumns.map((b) => <option key={b} value={b}>{BAY_LABEL[b]}</option>)}
@@ -79,10 +79,10 @@ export function SlideTwoControlTower({
               <div className="tower-bay-list">
                 {(laneCards[bay] || []).slice(0, 6).map((row) => (
                   <button type="button" key={`${bay}-${row.wo_id}`} className="tower-wo-item tower-wo-button" onClick={() => setSelectedWoId(row.wo_id)}>
-                    <div className="tower-wo-code">{row.wo_code}</div>
-                    <div className="tower-wo-sub">{row.asset_code || '-'} · {row.step_name || '-'}</div>
-                    {row.sap_reference_no ? <div className="tower-wo-sap">SAP: {row.sap_reference_no}</div> : null}
-                    <div className="tower-wo-sub">Queue: {row.queue_minutes_live || 0}m / EST {row.est_minutes || 0}m</div>
+                    <div className="tower-wo-code">{row.asset_code || '-'}</div>
+                    <div className="tower-wo-name">{row.asset_name || '-'}</div>
+                    <div className="tower-wo-sub">{row.step_name || '-'} · {String(row.wo_status || '-').toUpperCase()}</div>
+                    <div className="tower-wo-sub">Queue {row.queue_minutes_live || 0}m / EST {row.est_minutes || 0}m</div>
                   </button>
                 ))}
                 {(laneCards[bay] || []).length === 0 ? <div className="tower-empty">Kosong</div> : null}
@@ -101,7 +101,7 @@ export function SlideTwoControlTower({
             <table className="tower-active-table">
               <thead>
                 <tr>
-                  <th>WO</th>
+                  <th>Asset</th>
                   <th>Bay</th>
                   <th>Step</th>
                   <th>Queue</th>
@@ -112,7 +112,10 @@ export function SlideTwoControlTower({
               <tbody>
                 {towerRows.map((row) => (
                   <tr key={`s2-${row.wo_id}`}>
-                    <td>{row.wo_code}</td>
+                    <td>
+                      <div className="unit-name">{row.asset_code || '-'}</div>
+                      <div className="unit-sub">{row.asset_name || '-'}</div>
+                    </td>
                     <td>{BAY_LABEL[row.current_bay] || row.current_bay || '-'}</td>
                     <td>{row.step_name || '-'}</td>
                     <td>{row.queue_minutes_live || 0}m / {row.est_minutes || 0}m</td>

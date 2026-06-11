@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { apiRequest, ApiError } from '../../../services/api'
 import { mapMeResponse } from '../../../services/auth'
 import { SearchableSelect } from '../../shared/components/SearchableSelect'
+import { ModalPortal } from '../../shared/components/ModalPortal'
 
 const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -46,10 +47,12 @@ export function SchedulePage() {
   const [hasLoaded, setHasLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const [assets, setAssets] = useState([])
   const [me, setMe] = useState(null)
   const [calendarDays, setCalendarDays] = useState({})
   const [schedules, setSchedules] = useState([])
+  const [assetOptions, setAssetOptions] = useState([])
+  const [assetSearch, setAssetSearch] = useState('')
+  const [assetLoading, setAssetLoading] = useState(false)
 
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -70,13 +73,40 @@ export function SchedulePage() {
     },
   })
 
-  const loadMaster = async () => {
-    const [assetRes, meRes] = await Promise.all([
-      apiRequest('/assets?per_page=200'),
-      apiRequest('/auth/me'),
-    ])
-    setAssets(assetRes?.data || [])
+  const mapAssetOption = (asset) => ({
+    value: String(asset.id),
+    label: `${asset.code || '-'} | ${asset.name || '-'}`,
+  })
+
+  const loadCurrentUser = async () => {
+    const meRes = await apiRequest('/auth/me')
     setMe(mapMeResponse(meRes || null))
+  }
+
+  const loadAssetOptions = async (searchTerm = '') => {
+    setAssetLoading(true)
+    try {
+      const keyword = searchTerm.trim()
+      const rows = []
+      let page = 1
+      let lastPage = 1
+
+      do {
+        const params = new URLSearchParams()
+        params.set('per_page', '200')
+        params.set('page', String(page))
+        if (keyword) params.set('search', keyword)
+
+        const response = await apiRequest(`/assets?${params.toString()}`)
+        rows.push(...(response?.data || []))
+        lastPage = response?.last_page || 1
+        page += 1
+      } while (page <= lastPage)
+
+      setAssetOptions(rows.map(mapAssetOption))
+    } finally {
+      setAssetLoading(false)
+    }
   }
 
   const loadCalendar = async (year, month) => {
@@ -98,7 +128,7 @@ export function SchedulePage() {
     setLoading(true)
     try {
       await Promise.all([
-        loadMaster(),
+        loadCurrentUser(),
         loadCalendar(curDate.getFullYear(), curDate.getMonth() + 1),
         loadSchedules(),
       ])
@@ -126,6 +156,16 @@ export function SchedulePage() {
   useEffect(() => {
     loadCalendar(curDate.getFullYear(), curDate.getMonth() + 1).catch(() => {})
   }, [curDate])
+
+  useEffect(() => {
+    if (!showModal) return
+
+    const timer = window.setTimeout(() => {
+      loadAssetOptions(assetSearch).catch(() => {})
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [showModal, assetSearch])
 
   const filteredByDay = useMemo(() => {
     if (!selectedDay) return schedules
@@ -158,6 +198,7 @@ export function SchedulePage() {
   const openCreateModal = () => {
     setEditing(null)
     setForm(DEFAULT_FORM)
+    setAssetSearch('')
     setShowModal(true)
   }
 
@@ -175,6 +216,11 @@ export function SchedulePage() {
       status: row.status || 'scheduled',
       notes: row.notes || '',
     })
+    setAssetOptions((prev) => {
+      const selectedOption = mapAssetOption(row.asset || { id: row.asset_id, code: row.asset?.code, name: row.asset?.name })
+      return prev.some((option) => option.value === selectedOption.value) ? prev : [selectedOption, ...prev]
+    })
+    setAssetSearch('')
     setShowModal(true)
   }
 
@@ -320,7 +366,10 @@ export function SchedulePage() {
   }
 
   const rowList = filteredByDay
-  const assetOptions = useMemo(() => assets.map((a) => ({ value: String(a.id), label: `${a.code} - ${a.name}` })), [assets])
+  const selectedAssetOption = useMemo(() => {
+    if (!form.asset_id) return null
+    return assetOptions.find((opt) => opt.value === String(form.asset_id)) || null
+  }, [assetOptions, form.asset_id])
 
   return (
     <div className="p-6 space-y-5">
@@ -470,60 +519,77 @@ export function SchedulePage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
-            <h3 className="text-base font-semibold text-white">{editing ? 'Edit Jadwal' : 'Tambah Jadwal'}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className="text-xs text-slate-300 mb-1 block">Asset</label>
-                <SearchableSelect
-                  value={assetOptions.find((opt) => opt.value === String(form.asset_id)) || null}
-                  onChange={(option) => setForm((s) => ({ ...s, asset_id: option?.value || '' }))}
-                  options={assetOptions}
-                  placeholder="Pilih asset..."
-                  isClearable
-                />
+        <ModalPortal>
+          <div
+            onClick={() => setShowModal(false)}
+            className="max-h-screen overflow-y-auto hide-scrollbar py-8"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar p-5 space-y-4"
+              style={{ maxWidth: '32rem' }}
+            >
+              <h3 className="text-base font-semibold text-white">{editing ? 'Edit Jadwal' : 'Tambah Jadwal'}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-slate-300 mb-1 block">Asset</label>
+                  <SearchableSelect
+                    value={selectedAssetOption}
+                    onChange={(option) => setForm((s) => ({ ...s, asset_id: option?.value || '' }))}
+                    options={assetOptions}
+                    placeholder="Pilih asset..."
+                    isClearable
+                    inputValue={assetSearch}
+                    onInputChange={(value, meta) => {
+                      if (meta.action === 'input-change') setAssetSearch(value)
+                      if (meta.action === 'menu-close') setAssetSearch('')
+                    }}
+                    isLoading={assetLoading}
+                    filterOption={() => true}
+                    noOptionsMessage={() => assetLoading ? 'Memuat asset...' : 'Tidak ada asset'}
+                  />
+                </div>
+                <label className="text-xs text-slate-300">Tipe
+                  <select value={form.type} onChange={(e) => setForm((s) => ({ ...s, type: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full">
+                    <option value="preventive">preventive</option>
+                    <option value="periodic">periodic</option>
+                    <option value="conditional">conditional</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-300">Status
+                  <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full">
+                    <option value="scheduled">scheduled</option>
+                    <option value="due">due</option>
+                    <option value="overdue">overdue</option>
+                    <option value="completed">completed</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-300 sm:col-span-2">Nama Jadwal
+                  <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="Nama jadwal" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
+                </label>
+                <label className="text-xs text-slate-300">Interval HM
+                  <input type="number" value={form.interval_hm} onChange={(e) => setForm((s) => ({ ...s, interval_hm: e.target.value }))} placeholder="Interval HM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
+                </label>
+                <label className="text-xs text-slate-300">Interval KM
+                  <input type="number" value={form.interval_km} onChange={(e) => setForm((s) => ({ ...s, interval_km: e.target.value }))} placeholder="Interval KM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
+                </label>
+                <label className="text-xs text-slate-300">Tanggal Due
+                  <input type="date" value={form.next_due_at} onChange={(e) => setForm((s) => ({ ...s, next_due_at: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
+                </label>
+                <label className="text-xs text-slate-300">Next Due HM
+                  <input type="number" value={form.next_due_hm} onChange={(e) => setForm((s) => ({ ...s, next_due_hm: e.target.value }))} placeholder="Next due HM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
+                </label>
+                <label className="text-xs text-slate-300 sm:col-span-2">Catatan
+                  <textarea value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} placeholder="Catatan" className="input mt-1 px-3 py-2 rounded-xl text-sm min-h-20 w-full" />
+                </label>
               </div>
-              <label className="text-xs text-slate-300">Tipe
-                <select value={form.type} onChange={(e) => setForm((s) => ({ ...s, type: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full">
-                  <option value="preventive">preventive</option>
-                  <option value="periodic">periodic</option>
-                  <option value="conditional">conditional</option>
-                </select>
-              </label>
-              <label className="text-xs text-slate-300">Status
-                <select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full">
-                  <option value="scheduled">scheduled</option>
-                  <option value="due">due</option>
-                  <option value="overdue">overdue</option>
-                  <option value="completed">completed</option>
-                </select>
-              </label>
-              <label className="text-xs text-slate-300 sm:col-span-2">Nama Jadwal
-                <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="Nama jadwal" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
-              </label>
-              <label className="text-xs text-slate-300">Interval HM
-                <input type="number" value={form.interval_hm} onChange={(e) => setForm((s) => ({ ...s, interval_hm: e.target.value }))} placeholder="Interval HM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
-              </label>
-              <label className="text-xs text-slate-300">Interval KM
-                <input type="number" value={form.interval_km} onChange={(e) => setForm((s) => ({ ...s, interval_km: e.target.value }))} placeholder="Interval KM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
-              </label>
-              <label className="text-xs text-slate-300">Tanggal Due
-                <input type="date" value={form.next_due_at} onChange={(e) => setForm((s) => ({ ...s, next_due_at: e.target.value }))} className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
-              </label>
-              <label className="text-xs text-slate-300">Next Due HM
-                <input type="number" value={form.next_due_hm} onChange={(e) => setForm((s) => ({ ...s, next_due_hm: e.target.value }))} placeholder="Next due HM" className="input mt-1 px-3 py-2 rounded-xl text-sm w-full" />
-              </label>
-              <label className="text-xs text-slate-300 sm:col-span-2">Catatan
-                <textarea value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} placeholder="Catatan" className="input mt-1 px-3 py-2 rounded-xl text-sm min-h-20 w-full" />
-              </label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl border border-slate-600 text-sm text-slate-200">Batal</button>
-              <button onClick={handleSaveSchedule} disabled={saving} className="btn-primary px-4 py-2 rounded-xl text-sm text-white disabled:opacity-60">{saving ? 'Menyimpan...' : 'Simpan'}</button>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl border border-slate-600 text-sm text-slate-200">Batal</button>
+                <button onClick={handleSaveSchedule} disabled={saving} className="btn-primary px-4 py-2 rounded-xl text-sm text-white disabled:opacity-60">{saving ? 'Menyimpan...' : 'Simpan'}</button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   )

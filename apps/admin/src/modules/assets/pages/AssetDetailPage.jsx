@@ -1033,7 +1033,7 @@ export function AssetDetailPage() {
 
       {editModalOpen && (
         <ModalPortal>
-          <div onClick={() => setEditModalOpen(false)} className="max-h-screen overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-8">
+          <div onClick={() => setEditModalOpen(false)} className="max-h-screen overflow-y-auto hide-scrollbar py-8">
             <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
               <div className="p-5 border-b border-slate-700"><h3 className="font-semibold text-white">Edit Informasi Asset</h3></div>
               <div className="p-5 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -1213,7 +1213,7 @@ export function AssetDetailPage() {
 
       {photoPreviewModalOpen && selectedPhoto && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center px-4 py-8 overflow-y-auto">
+          <div className="fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center px-4 py-8 overflow-y-auto hide-scrollbar">
             <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
                 <div>

@@ -24,7 +24,7 @@ class WorkOrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = WorkOrder::with(['asset:id,name,code', 'schedule:id,name,next_due_at,status', 'supervisor:id,name', 'assignees:id,name'])
+        $query = WorkOrder::with(['asset:id,name,code,io_code,veh_plate_no,plate_number', 'schedule:id,name,next_due_at,status', 'supervisor:id,name', 'assignees:id,name'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->priority, fn ($q) => $q->where('priority', $request->priority))
             ->when($request->type, fn ($q) => $q->where('type', $request->type))
@@ -34,7 +34,17 @@ class WorkOrderController extends Controller
                 $q->where(function ($sub) use ($needle) {
                     $sub->where('code', 'like', "%{$needle}%")
                         ->orWhere('sap_reference_no', 'like', "%{$needle}%")
-                        ->orWhere('title', 'like', "%{$needle}%");
+                        ->orWhere('title', 'like', "%{$needle}%")
+                        ->orWhere('description', 'like', "%{$needle}%")
+                        ->orWhereHas('asset', function ($assetQ) use ($needle) {
+                            $assetQ->where('code', 'like', "%{$needle}%")
+                                ->orWhere('io_code', 'like', "%{$needle}%")
+                                ->orWhere('name', 'like', "%{$needle}%")
+                                ->orWhere('veh_plate_no', 'like', "%{$needle}%")
+                                ->orWhere('plate_number', 'like', "%{$needle}%")
+                                ->orWhere('asset_no', 'like', "%{$needle}%")
+                                ->orWhere('serial_number', 'like', "%{$needle}%");
+                        });
                 });
             })
             ->when($request->from, fn ($q) => $q->whereDate('created_at', '>=', $request->from))

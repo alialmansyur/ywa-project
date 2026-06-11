@@ -301,7 +301,10 @@ class WorkshopControlTowerService
                 'wo.supervisor_id',
                 'wo.created_at as wo_created_at',
                 'a.code as asset_code',
+                'a.io_code as asset_io_code',
                 'a.name as asset_name',
+                'a.asset_no as asset_no',
+                'a.serial_number',
                 DB::raw('COALESCE(a.veh_plate_no, a.plate_number) as license_plate'),
                 DB::raw('COALESCE(a.veh_plate_no, a.plate_number) as police_no'),
                 'sup.name as supervisor_name',
@@ -363,8 +366,15 @@ class WorkshopControlTowerService
                 $q->where(function ($sub) use ($needle) {
                     $sub->where('wo.code', 'like', "%{$needle}%")
                         ->orWhere('wo.sap_reference_no', 'like', "%{$needle}%")
+                        ->orWhere('wo.title', 'like', "%{$needle}%")
+                        ->orWhere('wo.description', 'like', "%{$needle}%")
                         ->orWhere('a.code', 'like', "%{$needle}%")
+                        ->orWhere('a.io_code', 'like', "%{$needle}%")
                         ->orWhere('a.name', 'like', "%{$needle}%")
+                        ->orWhere('a.asset_no', 'like', "%{$needle}%")
+                        ->orWhere('a.serial_number', 'like', "%{$needle}%")
+                        ->orWhere('a.veh_plate_no', 'like', "%{$needle}%")
+                        ->orWhere('a.plate_number', 'like', "%{$needle}%")
                         ->orWhere('sup.name', 'like', "%{$needle}%")
                         ->orWhere('s.step_name', 'like', "%{$needle}%");
                 });

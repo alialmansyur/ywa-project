@@ -865,8 +865,11 @@ export function UsersPage() {
 
       {selected && (
         <ModalPortal>
-        <div onClick={() => setSelected(null)}>
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          onClick={() => setSelected(null)}
+          className="max-h-screen overflow-y-auto hide-scrollbar py-8"
+        >
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-xl max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-700">
               <div>
                 <div className="font-bold text-white">{selected.name}</div>
@@ -896,8 +899,11 @@ export function UsersPage() {
 
       {formModal && (
         <ModalPortal>
-        <div onClick={closeForm}>
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          onClick={closeForm}
+          className="max-h-screen overflow-y-auto hide-scrollbar py-8"
+        >
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 border-b border-slate-700">
               <h3 className="font-bold text-white">{formModal.mode === 'edit' ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h3>
             </div>
@@ -985,8 +991,11 @@ export function UsersPage() {
 
       {importModalOpen && (
         <ModalPortal>
-        <div onClick={() => !importLoading && setImportModalOpen(false)}>
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          onClick={() => !importLoading && setImportModalOpen(false)}
+          className="max-h-screen overflow-y-auto hide-scrollbar py-8"
+        >
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 border-b border-slate-700">
               <h3 className="font-bold text-white">Upload Excel User Operator</h3>
             </div>

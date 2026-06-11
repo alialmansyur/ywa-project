@@ -458,7 +458,7 @@ export function ReportsPage({ type = 'p2h', title }) {
       {type === 'p2h' && selectedP2h ? (
         <ModalPortal>
           <div onClick={() => !p2hDetailLoading && setSelectedP2h(null)}>
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-5 border-b border-slate-700">
                 <div>
                   <div className="text-xs text-blue-400 font-mono">{selectedP2h.code || `P2H-${selectedP2h.id}`}</div>

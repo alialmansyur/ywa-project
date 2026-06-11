@@ -23,7 +23,14 @@ class UserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = User::query()->with(['roles:id,name', 'profile']);
+        $query = User::query()->with([
+            'roles:id,name',
+            'profile',
+            'assetAssignments' => fn ($relation) => $relation
+                ->select(['id', 'asset_id', 'user_id', 'assigned_at'])
+                ->whereNull('released_at')
+                ->latest('assigned_at'),
+        ]);
 
         if ($request->filled('search')) {
             $search = strtolower((string) $request->search);

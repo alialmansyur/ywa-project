@@ -12,7 +12,7 @@ export function ModalPortal({ children }) {
   }, [])
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center overflow-y-auto hide-scrollbar p-4">
       {children}
     </div>,
     document.body,

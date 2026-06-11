@@ -27,6 +27,11 @@ const DEFAULT_FORM = {
   notes: '',
 }
 
+const DEFAULT_ASSIGN_FORM = {
+  user_id: '',
+  notes: '',
+}
+
 const STATUS_OPTIONS = ['active', 'inactive', 'maintenance', 'breakdown']
 
 const swal = Swal.mixin({
@@ -40,6 +45,7 @@ const swal = Swal.mixin({
 })
 
 function toAsset(item) {
+  const assignment = item.active_assignment || null
   return {
     id: item.id,
     publicUuid: item.public_uuid || '',
@@ -65,6 +71,16 @@ function toAsset(item) {
     notes: item.notes || '-',
     qrCode: item.qr_code || '-',
     latestLocation: item.latest_location || null,
+    activeAssignment: assignment ? {
+      id: assignment.id,
+      assignedAt: assignment.assigned_at || null,
+      notes: assignment.notes || '',
+      user: assignment.user ? {
+        id: assignment.user.id,
+        name: assignment.user.name || '-',
+        email: assignment.user.email || '-',
+      } : null,
+    } : null,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
   }
@@ -83,6 +99,11 @@ function statusBadge(status) {
 
 function SkeletonBox({ className = '' }) {
   return <div className={`animate-pulse rounded-xl bg-slate-700/60 ${className}`} />
+}
+
+function formatAssignmentLabel(asset) {
+  if (!asset?.activeAssignment?.user) return 'Belum di-assign'
+  return asset.activeAssignment.user.name || asset.activeAssignment.user.email || 'User aktif'
 }
 
 function EyeIcon() { return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" /><circle cx="12" cy="12" r="3" strokeWidth="2" /></svg> }
@@ -119,6 +140,10 @@ export function AssetsPage() {
   const [importProgress, setImportProgress] = useState(0)
   const [qrModal, setQrModal] = useState(null)
   const [scanCode, setScanCode] = useState('')
+  const [assignableUsers, setAssignableUsers] = useState([])
+  const [assignModal, setAssignModal] = useState(null)
+  const [assignForm, setAssignForm] = useState(DEFAULT_ASSIGN_FORM)
+  const [assignmentLoading, setAssignmentLoading] = useState(false)
 
   const stats = useMemo(() => ({
     total,
@@ -156,12 +181,37 @@ export function AssetsPage() {
     }
   }
 
+  const fetchAssignableUsers = async () => {
+    try {
+      const response = await apiRequest('/users?per_page=200&role=operator&is_active=true')
+      const rows = Array.isArray(response?.data) ? response.data : []
+      const normalized = rows
+        .map((item) => ({
+          id: Number(item.id),
+          name: item.name || '-',
+          email: item.email || '-',
+          role: item.roles?.[0]?.name || '',
+          isActive: Boolean(item.is_active),
+          activeAssignmentAssetId: item.asset_assignments?.[0]?.asset_id ? Number(item.asset_assignments[0].asset_id) : null,
+        }))
+        .filter((item) => item.isActive && !item.activeAssignmentAssetId)
+
+      setAssignableUsers(normalized.sort((a, b) => a.name.localeCompare(b.name)))
+    } catch (error) {
+      await swal.fire({ icon: 'error', title: 'Gagal', text: error instanceof ApiError ? error.message : 'Gagal memuat user assignment.' })
+    }
+  }
+
   useEffect(() => {
     fetchAssets()
   }, [page, perPage, query, statusFilter])
 
   useEffect(() => {
     fetchAssetCategories()
+  }, [])
+
+  useEffect(() => {
+    fetchAssignableUsers()
   }, [])
 
   const openCreate = () => {
@@ -198,6 +248,20 @@ export function AssetsPage() {
     if (submitLoading) return
     setForm(DEFAULT_FORM)
     setFormModal(null)
+  }
+
+  const openAssignModal = (asset) => {
+    setAssignForm({
+      user_id: asset?.activeAssignment?.user?.id ? String(asset.activeAssignment.user.id) : '',
+      notes: asset?.activeAssignment?.notes || '',
+    })
+    setAssignModal(asset)
+  }
+
+  const closeAssignModal = (force = false) => {
+    if (assignmentLoading && !force) return
+    setAssignModal(null)
+    setAssignForm(DEFAULT_ASSIGN_FORM)
   }
 
   const handleSave = async () => {
@@ -275,6 +339,64 @@ export function AssetsPage() {
       await fetchAssets()
     } catch (error) {
       await swal.fire({ icon: 'error', title: 'Gagal', text: error instanceof ApiError ? error.message : 'Gagal hapus aset.' })
+    }
+  }
+
+  const handleAssign = async () => {
+    if (!assignModal?.id || !assignForm.user_id) {
+      await swal.fire({ icon: 'warning', title: 'Validasi', text: 'Pilih member/operator terlebih dahulu.' })
+      return
+    }
+
+    setAssignmentLoading(true)
+    try {
+      await apiRequest('/assets/assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: assignModal.id,
+          user_id: Number(assignForm.user_id),
+          notes: assignForm.notes || null,
+        }),
+      })
+      await swal.fire({ icon: 'success', title: 'Berhasil', text: 'Asset berhasil di-assign.' })
+      closeAssignModal(true)
+      await fetchAssets()
+    } catch (error) {
+      await swal.fire({ icon: 'error', title: 'Gagal', text: error instanceof ApiError ? error.message : 'Gagal assign asset.' })
+    } finally {
+      setAssignmentLoading(false)
+    }
+  }
+
+  const handleUnassign = async (asset) => {
+    const confirm = await swal.fire({
+      title: 'Lepas assignment asset ini?',
+      text: `${asset.code} - ${asset.name}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, lepas',
+      cancelButtonText: 'Batal',
+    })
+    if (!confirm.isConfirmed) return
+
+    setAssignmentLoading(true)
+    try {
+      await apiRequest('/assets/assignment', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_id: asset.id }),
+      })
+      await swal.fire({ icon: 'success', title: 'Berhasil', text: 'Assignment asset berhasil dilepas.' })
+      if (selected?.id === asset.id) {
+        setSelected((prev) => prev ? { ...prev, activeAssignment: null } : prev)
+        setSelectedDetail((prev) => prev ? { ...prev, activeAssignment: null } : prev)
+      }
+      await fetchAssets()
+    } catch (error) {
+      await swal.fire({ icon: 'error', title: 'Gagal', text: error instanceof ApiError ? error.message : 'Gagal unassign asset.' })
+    } finally {
+      setAssignmentLoading(false)
     }
   }
 
@@ -601,6 +723,7 @@ export function AssetsPage() {
                 <tr className="border-b border-slate-700 bg-slate-800/50">
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Aset</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Kategori</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Dipakai Oleh</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">HM/KM</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                   <th className="py-3 px-4" />
@@ -612,23 +735,30 @@ export function AssetsPage() {
                     <tr key={i}>
                       <td className="py-3 px-4"><SkeletonBox className="h-9 w-40" /></td>
                       <td className="py-3 px-4"><SkeletonBox className="h-6 w-24" /></td>
+                      <td className="py-3 px-4"><SkeletonBox className="h-6 w-28" /></td>
                       <td className="py-3 px-4"><SkeletonBox className="h-6 w-20" /></td>
                       <td className="py-3 px-4"><SkeletonBox className="h-6 w-20" /></td>
                       <td className="py-3 px-4"><SkeletonBox className="h-8 w-40 ml-auto" /></td>
                     </tr>
                   ))
                 ) : assets.length === 0 ? (
-                  <tr><td colSpan="5" className="py-8 text-center text-slate-400">Tidak ada data aset.</td></tr>
+                  <tr><td colSpan="6" className="py-8 text-center text-slate-400">Tidak ada data aset.</td></tr>
                 ) : (
                   assets.map((a) => (
                     <tr key={a.id} className="hover:bg-slate-700/20">
-                      <td className="py-3 px-4"><button type="button" onClick={() => openDetailPage(a)} className="text-xs font-semibold text-blue-300 hover:text-blue-200 hover:underline">{a.ioCode}</button><div className="text-xs text-slate-200">{a.name}</div></td>
+                      <td className="py-3 px-4"><button type="button" onClick={() => openDetailPage(a)} className="text-xs font-semibold text-blue-300 hover:text-blue-200 hover:underline">{a.code}</button><div className="text-xs text-slate-200">{a.name}</div></td>
                       <td className="py-3 px-4 text-xs text-slate-300">{a.categoryName}</td>
+                      <td className="py-3 px-4 text-xs">
+                        <div className={a.activeAssignment?.user ? 'text-slate-200' : 'text-slate-500'}>{formatAssignmentLabel(a)}</div>
+                        {a.activeAssignment?.user?.email ? <div className="text-slate-500">{a.activeAssignment.user.email}</div> : null}
+                      </td>
                       <td className="py-3 px-4 text-xs text-slate-300">{a.currentHm > 0 ? `${a.currentHm.toLocaleString()} HM` : `${a.currentKm.toLocaleString()} KM`}</td>
                       <td className="py-3 px-4">{statusBadge(a.status)}</td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2 justify-end items-center">
                           <button onClick={() => openDetailPage(a)} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-blue-400 border border-slate-600/70 bg-slate-700/30 hover:bg-blue-500/10" type="button" title="Detail"><EyeIcon /></button>
+                          <button onClick={(e) => { e.stopPropagation(); openAssignModal(a) }} className="px-2.5 h-8 rounded-lg inline-flex items-center justify-center text-xs text-cyan-300 border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20" type="button" title="Assign">Assign</button>
+                          {a.activeAssignment?.user ? <button onClick={(e) => { e.stopPropagation(); handleUnassign(a) }} className="px-2.5 h-8 rounded-lg inline-flex items-center justify-center text-xs text-rose-300 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20" type="button" title="Unassign">Unassign</button> : null}
                           <button onClick={(e) => { e.stopPropagation(); openEdit(a) }} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-yellow-400 border border-slate-600/70 bg-slate-700/30 hover:bg-yellow-500/10" type="button" title="Edit"><EditIcon /></button>
                           <button onClick={(e) => { e.stopPropagation(); setQrModal(a) }} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-purple-400 border border-slate-600/70 bg-slate-700/30 hover:bg-purple-500/10" type="button" title="QR Code"><QrIcon /></button>
                           <button onClick={(e) => { e.stopPropagation(); handleToggle(a) }} className={`w-8 h-8 rounded-lg inline-flex items-center justify-center border ${a.status === 'active' ? 'text-emerald-300 border-emerald-400/60 bg-emerald-500/10' : 'text-slate-300 border-slate-500/70 bg-slate-600/20'}`} type="button" title="Aktif/Nonaktif">{a.status === 'active' ? <StatusOnIcon /> : <StatusOffIcon />}</button>
@@ -648,8 +778,11 @@ export function AssetsPage() {
             <div key={a.id} className="card p-4 space-y-3 cursor-pointer hover:border-slate-600" onClick={() => openDetail(a)}>
               <div className="flex items-center justify-between"><div><div className="text-xs font-semibold text-blue-300">{a.code}</div><div className="text-sm font-semibold text-slate-100">{a.name}</div></div>{statusBadge(a.status)}</div>
               <div className="text-xs text-slate-400">{a.categoryName}</div>
+              <div className="text-xs text-slate-400">Dipakai oleh: <span className={a.activeAssignment?.user ? 'text-slate-200' : 'text-slate-500'}>{formatAssignmentLabel(a)}</span></div>
               <div className="text-xs text-slate-400">{a.currentHm > 0 ? `${a.currentHm.toLocaleString()} HM` : `${a.currentKm.toLocaleString()} KM`}</div>
               <div className="flex gap-2 justify-end">
+                <button onClick={(e) => { e.stopPropagation(); openAssignModal(a) }} className="px-2.5 h-8 rounded-lg inline-flex items-center justify-center text-xs text-cyan-300 border border-cyan-500/40 bg-cyan-500/10">Assign</button>
+                {a.activeAssignment?.user ? <button onClick={(e) => { e.stopPropagation(); handleUnassign(a) }} className="px-2.5 h-8 rounded-lg inline-flex items-center justify-center text-xs text-rose-300 border border-rose-500/40 bg-rose-500/10">Unassign</button> : null}
                 <button onClick={(e) => { e.stopPropagation(); openEdit(a) }} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-yellow-400 border border-slate-600/70 bg-slate-700/30"><EditIcon /></button>
                 <button onClick={(e) => { e.stopPropagation(); setQrModal(a) }} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-purple-400 border border-slate-600/70 bg-slate-700/30"><QrIcon /></button>
                 <button onClick={(e) => { e.stopPropagation(); handleToggle(a) }} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-emerald-300 border border-emerald-400/60 bg-emerald-500/10">{a.status === 'active' ? <StatusOnIcon /> : <StatusOffIcon />}</button>
@@ -679,13 +812,13 @@ export function AssetsPage() {
 
       {formModal && (
         <ModalPortal>
-          <div onClick={closeForm} className="max-h-screen overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-8">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
+          <div onClick={closeForm} className="max-h-screen overflow-y-auto hide-scrollbar py-8">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
               <div className="p-5 border-b border-slate-700"><h3 className="font-semibold">{formModal.mode === 'edit' ? 'Edit Aset' : 'Tambah Aset'}</h3></div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {formModal.mode === 'create' && <label className="text-xs text-slate-300">Kode Aset<input value={form.code} onChange={(e) => setForm((s) => ({ ...s, code: e.target.value }))} placeholder="Kode aset" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>}
                 <label className="text-xs text-slate-300">KODE IO<input value={form.io_code} onChange={(e) => setForm((s) => ({ ...s, io_code: e.target.value }))} placeholder="KODE IO" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
-                <label className="text-xs text-slate-300 md:col-span-2">Nama Aset / Description<input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="Nama aset / Description" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
+                <label className="text-xs text-slate-300 sm:col-span-2">Nama Aset / Description<input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="Nama aset / Description" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
                 <label className="text-xs text-slate-300">Brand<input value={form.brand} onChange={(e) => setForm((s) => ({ ...s, brand: e.target.value }))} placeholder="Brand" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
                 <label className="text-xs text-slate-300">Model<input value={form.model} onChange={(e) => setForm((s) => ({ ...s, model: e.target.value }))} placeholder="Model" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
                 <label className="text-xs text-slate-300">Company Code<input value={form.company_code} onChange={(e) => setForm((s) => ({ ...s, company_code: e.target.value }))} placeholder="Company Code" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
@@ -701,7 +834,7 @@ export function AssetsPage() {
                 <label className="text-xs text-slate-300">Asset No.<input value={form.asset_no} onChange={(e) => setForm((s) => ({ ...s, asset_no: e.target.value }))} placeholder="Asset No." className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
                 <label className="text-xs text-slate-300">Plate Number (Legacy)<input value={form.plate_number} onChange={(e) => setForm((s) => ({ ...s, plate_number: e.target.value }))} placeholder="Plate Number (legacy)" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
                 <label className="text-xs text-slate-300">Veh. Plate No. / No. Polisi<input value={form.veh_plate_no} onChange={(e) => setForm((s) => ({ ...s, veh_plate_no: e.target.value }))} placeholder="Veh. Plate No. / No. Polisi" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" /></label>
-                <label className="text-xs text-slate-300 md:col-span-3 xl:col-span-4">Catatan<textarea value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} placeholder="Catatan" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" rows={3} /></label>
+                <label className="text-xs text-slate-300 sm:col-span-2">Catatan<textarea value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} placeholder="Catatan" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" rows={3} /></label>
               </div>
               <div className="p-5 border-t border-slate-700 flex gap-2 justify-end">
                 <button type="button" onClick={closeForm} className="px-4 py-2 rounded-xl border border-slate-600 text-slate-300">Batal</button>
@@ -715,7 +848,7 @@ export function AssetsPage() {
       {selected && (
         <ModalPortal>
           <div onClick={() => { setSelected(null); setSelectedDetail(null); setSelectedHistory([]); setSelectedSchedule([]) }}>
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
               <div className="p-5 border-b border-slate-700"><div className="font-bold text-blue-300">{selected.code}</div><div className="text-sm text-slate-200">{selected.name}</div></div>
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -724,6 +857,7 @@ export function AssetsPage() {
                   <div><div className="text-slate-500 text-xs">Status</div><div>{statusBadge((selectedDetail || selected).status)}</div></div>
                   <div><div className="text-slate-500 text-xs">QR Code</div><div className="text-slate-200">{(selectedDetail || selected).qrCode}</div></div>
                   <div><div className="text-slate-500 text-xs">Kategori</div><div className="text-slate-200">{(selectedDetail || selected).categoryName}</div></div>
+                  <div><div className="text-slate-500 text-xs">Dipakai Oleh</div><div className="text-slate-200">{formatAssignmentLabel(selectedDetail || selected)}</div></div>
                   <div><div className="text-slate-500 text-xs">Company / Plant</div><div className="text-slate-200">{(selectedDetail || selected).companyCode} / {(selectedDetail || selected).plant}</div></div>
                   <div><div className="text-slate-500 text-xs">No Polisi</div><div className="text-slate-200">{(selectedDetail || selected).vehPlateNo}</div></div>
                   <div><div className="text-slate-500 text-xs">Chasis / Engine</div><div className="text-slate-200">{(selectedDetail || selected).chasisNo} / {(selectedDetail || selected).engineNo}</div></div>
@@ -739,12 +873,51 @@ export function AssetsPage() {
                 </div>
               </div>
               <div className="p-5 border-t border-slate-700 flex gap-2 flex-wrap">
+                <button type="button" onClick={() => openAssignModal(selectedDetail || selected)} className="px-3 py-2 rounded-xl border border-cyan-500/40 text-cyan-300 text-sm">Assign</button>
+                {(selectedDetail || selected)?.activeAssignment?.user ? <button type="button" onClick={() => handleUnassign(selectedDetail || selected)} className="px-3 py-2 rounded-xl border border-rose-500/40 text-rose-300 text-sm">Unassign</button> : null}
                 <button type="button" onClick={handleUpdateHmKm} className="px-3 py-2 rounded-xl border border-slate-600 text-slate-200 text-sm">Update HM/KM</button>
                 <button type="button" onClick={handleUpdateLocation} className="px-3 py-2 rounded-xl border border-slate-600 text-slate-200 text-sm">Update Lokasi</button>
                 <button type="button" onClick={() => setQrModal(selectedDetail || selected)} className="px-3 py-2 rounded-xl border border-purple-500/40 text-purple-300 text-sm">QR Code</button>
                 <button type="button" onClick={() => { openEdit(selectedDetail || selected); setSelected(null) }} className="px-3 py-2 rounded-xl border border-yellow-500/40 text-yellow-300 text-sm">Edit</button>
                 <button type="button" onClick={() => handleToggle(selectedDetail || selected)} className="px-3 py-2 rounded-xl border border-emerald-500/40 text-emerald-300 text-sm">Aktif/Nonaktif</button>
                 <button type="button" onClick={() => handleDelete(selectedDetail || selected)} className="px-3 py-2 rounded-xl border border-red-500/40 text-red-300 text-sm">Hapus</button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {assignModal && (
+        <ModalPortal>
+          <div onClick={closeAssignModal} className="max-h-screen overflow-y-auto hide-scrollbar py-8">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-4rem)] overflow-y-auto hide-scrollbar" onClick={(e) => e.stopPropagation()}>
+              <div className="p-5 border-b border-slate-700">
+                <h3 className="font-semibold">Assign Asset</h3>
+                <div className="text-xs text-slate-400 mt-1">{assignModal.code} - {assignModal.name}</div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-3">
+                  <div className="text-xs text-slate-500">Kondisi saat ini</div>
+                  <div className="text-sm text-slate-200 mt-1">{formatAssignmentLabel(assignModal)}</div>
+                  {assignModal.activeAssignment?.assignedAt ? <div className="text-xs text-slate-500 mt-1">Assigned at: {assignModal.activeAssignment.assignedAt}</div> : null}
+                </div>
+                <label className="text-xs text-slate-300">
+                  Member / Operator
+                  <select value={assignForm.user_id} onChange={(e) => setAssignForm((prev) => ({ ...prev, user_id: e.target.value }))} className="input mt-1 w-full px-3 py-2 rounded-xl text-sm">
+                    <option value="">Pilih user</option>
+                    {assignableUsers.map((user) => (
+                      <option key={user.id} value={user.id}>{user.name} ({user.role || 'user'})</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-300">
+                  Catatan
+                  <textarea value={assignForm.notes} onChange={(e) => setAssignForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Catatan assignment" className="input mt-1 w-full px-3 py-2 rounded-xl text-sm" rows={3} />
+                </label>
+              </div>
+              <div className="p-5 border-t border-slate-700 flex gap-2 justify-end">
+                <button type="button" onClick={closeAssignModal} className="px-4 py-2 rounded-xl border border-slate-600 text-slate-300" disabled={assignmentLoading}>Batal</button>
+                <button type="button" onClick={handleAssign} disabled={assignmentLoading} className="px-4 py-2 rounded-xl bg-cyan-600 text-white disabled:opacity-60">{assignmentLoading ? 'Menyimpan...' : 'Assign'}</button>
               </div>
             </div>
           </div>

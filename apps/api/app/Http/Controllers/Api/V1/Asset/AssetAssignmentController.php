@@ -33,11 +33,12 @@ class AssetAssignmentController extends Controller
     {
         $validated = $request->validate([
             'asset_id' => 'required|exists:assets,id',
+            'user_id' => 'nullable|exists:users,id',
             'notes' => 'nullable|string',
         ]);
 
         $result = DB::transaction(function () use ($validated, $request) {
-            $user = $request->user();
+            $targetUserId = (int) ($validated['user_id'] ?? $request->user()->id);
             $asset = Asset::query()->lockForUpdate()->findOrFail($validated['asset_id']);
 
             $existingOnAsset = AssetAssignment::query()
@@ -47,14 +48,14 @@ class AssetAssignmentController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if ($existingOnAsset && (int) $existingOnAsset->user_id !== (int) $user->id) {
+            if ($existingOnAsset && (int) $existingOnAsset->user_id !== $targetUserId) {
                 throw ValidationException::withMessages([
-                    'asset_id' => ['Aset sedang digunakan oleh user lain.'],
+                    'asset_id' => ['Aset sedang digunakan oleh ' . ($existingOnAsset->user?->name ?? 'user lain') . '.'],
                 ]);
             }
 
             $currentUserAssignment = AssetAssignment::query()
-                ->where('user_id', $user->id)
+                ->where('user_id', $targetUserId)
                 ->whereNull('released_at')
                 ->lockForUpdate()
                 ->first();
@@ -67,7 +68,7 @@ class AssetAssignmentController extends Controller
             if (! $assignment) {
                 $assignment = AssetAssignment::create([
                     'asset_id' => $asset->id,
-                    'user_id' => $user->id,
+                    'user_id' => $targetUserId,
                     'assigned_at' => now(),
                     'notes' => $validated['notes'] ?? null,
                 ]);
@@ -84,8 +85,17 @@ class AssetAssignmentController extends Controller
 
     public function unassign(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'asset_id' => 'nullable|exists:assets,id',
+            'user_id' => 'nullable|exists:users,id',
+        ]);
+
         $assignment = AssetAssignment::query()
-            ->where('user_id', $request->user()->id)
+            ->when(
+                ! empty($validated['asset_id']),
+                fn ($query) => $query->where('asset_id', $validated['asset_id']),
+                fn ($query) => $query->where('user_id', $validated['user_id'] ?? $request->user()->id)
+            )
             ->whereNull('released_at')
             ->latest('assigned_at')
             ->first();
@@ -103,4 +113,3 @@ class AssetAssignmentController extends Controller
         ]);
     }
 }
-

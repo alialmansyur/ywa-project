@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Swal from 'sweetalert2'
 import { TOKEN_KEY, getJson, revokeSession } from '../../../services/api'
 import { DEFAULT_SETTINGS } from './constants'
-import { elapsedSeconds, isActiveWorkshopRow, resolveBoardColumn } from './utils'
+import { buildWorkshopSearchText, elapsedSeconds, isActiveWorkshopRow, resolveBoardColumn } from './utils'
 import { KpiIcon } from './icons'
 import { SlideOneQueue } from './slides/SlideOneQueue'
 import { SlideTwoControlTower } from './slides/SlideTwoControlTower'
@@ -184,10 +184,22 @@ export function DashboardContent({ me }) {
   })
 
   const towerRows = useMemo(() => (towerQuery.data?.workOrders?.data || []).filter((row) => isActiveWorkshopRow(row)), [towerQuery.data])
+  const filteredTowerRows = useMemo(() => {
+    const normalizedQuery = towerQ.trim().toLowerCase()
+    return towerRows.filter((row) => {
+      if (normalizedQuery && !buildWorkshopSearchText(row).includes(normalizedQuery)) {
+        return false
+      }
+      if (towerBay !== 'all' && resolveBoardColumn(row) !== towerBay) return false
+      if (towerType !== 'all' && String(row.wo_type || '').toLowerCase() !== towerType) return false
+      if (towerStatus !== 'all' && String(row.wo_status || '').toLowerCase() !== towerStatus) return false
+      return true
+    })
+  }, [towerRows, towerQ, towerBay, towerType, towerStatus])
   const boardBuckets = useMemo(() => {
     const order = ['approval', 'washing_bay', 'inspection_pkb', 'checking', 'waiting_bay', 'create_wo', 'repair', 'qc', 'ready_bay_close', 'handover']
     const out = Object.fromEntries(order.map((bay) => [bay, []]))
-    for (const row of towerRows) {
+    for (const row of filteredTowerRows) {
       const key = resolveBoardColumn(row)
       if (!out[key]) out[key] = []
       out[key].push(row)
@@ -196,9 +208,9 @@ export function DashboardContent({ me }) {
       out[key] = out[key].sort((a, b) => Number(b.queue_minutes_live || 0) - Number(a.queue_minutes_live || 0))
     }
     return out
-  }, [towerRows])
+  }, [filteredTowerRows])
 
-  const queueRows = useMemo(() => towerRows, [towerRows])
+  const queueRows = useMemo(() => filteredTowerRows, [filteredTowerRows])
   const activeCount = towerRows.length
   const holdCount = towerRows.filter((row) => String(row.wo_status || '').toLowerCase() === 'on_hold').length
   const inProgressCount = towerRows.filter((row) => String(row.wo_status || '').toLowerCase() === 'in_progress').length
@@ -244,28 +256,15 @@ export function DashboardContent({ me }) {
     return listRows.filter((row) => row.next_due_at && new Date(row.next_due_at).toISOString().slice(0, 10) === selectedDay)
   }, [scheduleCalendarQuery.data?.events_by_day, scheduleListQuery.data?.data, selectedDay])
 
-  const queueRowsPrepared = useMemo(() => {
-    const rows = queueRows.filter((row) => {
-      if (towerQ.trim()) {
-        const haystack = [row.wo_code, row.sap_reference_no, row.asset_code, row.asset_name, row.step_name].filter(Boolean).join(' ').toLowerCase()
-        if (!haystack.includes(towerQ.trim().toLowerCase())) return false
-      }
-      if (towerBay !== 'all' && resolveBoardColumn(row) !== towerBay) return false
-      if (towerType !== 'all' && String(row.wo_type || '').toLowerCase() !== towerType) return false
-      if (towerStatus !== 'all' && String(row.wo_status || '').toLowerCase() !== towerStatus) return false
-      return true
-    })
-    return rows
-  }, [queueRows, towerQ, towerBay, towerType, towerStatus])
   const queueRowsFifo = useMemo(() => {
-    return [...queueRowsPrepared].sort((a, b) => {
+    return [...queueRows].sort((a, b) => {
       const ta = new Date(a?.wo_created_at || a?.created_at || 0).getTime()
       const tb = new Date(b?.wo_created_at || b?.created_at || 0).getTime()
       if (ta !== tb) return ta - tb
       return Number(a?.wo_id || 0) - Number(b?.wo_id || 0)
     })
-  }, [queueRowsPrepared])
-  const overSlaCount = queueRowsPrepared.filter((row) => Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0)).length
+  }, [queueRows])
+  const overSlaCount = queueRows.filter((row) => Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0)).length
 
   const runningTextItems = useMemo(() => {
     const raw = String(settings.runningText || '').trim()
@@ -334,7 +333,7 @@ export function DashboardContent({ me }) {
   }, [towerQuery.dataUpdatedAt, summaryQuery.dataUpdatedAt])
 
   useEffect(() => {
-    const currentRows = queueRowsPrepared || []
+    const currentRows = queueRows || []
     if (!towerQuery.dataUpdatedAt || currentRows.length === 0) return
 
     const knownIds = new Set((notifiedQueueIds || []).map((id) => String(id)))
@@ -364,7 +363,7 @@ export function DashboardContent({ me }) {
     const merged = Array.from(new Set([...(notifiedQueueIds || []).map((id) => String(id)), ...newIds]))
     setNotifiedQueueIds(merged)
     localStorage.setItem('tapg-dashboard-notified-queue-ids', JSON.stringify(merged))
-  }, [towerQuery.dataUpdatedAt, queueRowsPrepared, notifiedQueueIds])
+  }, [towerQuery.dataUpdatedAt, queueRows, notifiedQueueIds])
 
   const handleManualReload = async () => {
     setIsManualReloading(true)
@@ -478,7 +477,7 @@ export function DashboardContent({ me }) {
             )}
             <main className="content">
           <div className="content-top">
-            <div className="content-meta"><p>Auto {settings.sliderDurationSec}s</p><p>FIFO {queueRowsPrepared.length} WO</p><p>Feed {(towerQuery.data?.liveFeed || []).length}</p></div>
+            <div className="content-meta"><p>Auto {settings.sliderDurationSec}s</p><p>FIFO {queueRows.length} WO</p><p>Feed {(towerQuery.data?.liveFeed || []).length}</p></div>
             <div className="slider-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <button aria-label="Pindah ke slide antrean FIFO" className={activeSlide === 0 ? 'dot active' : 'dot'} onClick={() => setActiveSlide(0)} />
               <button aria-label="Pindah ke slide control tower" className={activeSlide === 1 ? 'dot active' : 'dot'} onClick={() => setActiveSlide(1)} />
@@ -486,8 +485,8 @@ export function DashboardContent({ me }) {
           </div>
           <div className="slider-window">
             <div className="slider-track" style={{ '--slide-count': TOTAL_SLIDES, width: `${TOTAL_SLIDES * 100}%`, transform: `translateX(-${activeSlide * (100 / TOTAL_SLIDES)}%)` }}>
-              <SlideOneQueue settings={settings} queueRows={queueRowsFifo} onRowClick={(row) => setSelectedWoId(row.wo_id)} isLoading={towerQuery.isLoading} error={towerQuery.error} now={now} />
-              <SlideTwoControlTower settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} towerBay={towerBay} setTowerBay={setTowerBay} towerType={towerType} setTowerType={setTowerType} towerStatus={towerStatus} setTowerStatus={setTowerStatus} laneCards={boardBuckets} setSelectedWoId={setSelectedWoId} towerRows={towerRows} towerQuery={towerQuery} isLoading={towerQuery.isLoading} error={towerQuery.error} bottleneckSummary={towerQuery.data?.bottlenecks?.summary || towerQuery.data?.bottlenecks || null} />
+              <SlideOneQueue settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} queueRows={queueRowsFifo} onRowClick={(row) => setSelectedWoId(row.wo_id)} isLoading={towerQuery.isLoading} error={towerQuery.error} now={now} />
+              <SlideTwoControlTower settings={settings} towerQ={towerQ} setTowerQ={setTowerQ} towerBay={towerBay} setTowerBay={setTowerBay} towerType={towerType} setTowerType={setTowerType} towerStatus={towerStatus} setTowerStatus={setTowerStatus} laneCards={boardBuckets} setSelectedWoId={setSelectedWoId} towerRows={filteredTowerRows} towerQuery={towerQuery} isLoading={towerQuery.isLoading} error={towerQuery.error} bottleneckSummary={towerQuery.data?.bottlenecks?.summary || towerQuery.data?.bottlenecks || null} />
               {/* <SlideThreeSchedule
                 settings={settings}
                 scheduleQ={scheduleQ}
