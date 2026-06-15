@@ -97,11 +97,11 @@ docker compose ps
 
 | Service | URL |
 |---------|-----|
-| phpMyAdmin | http://localhost:8081 |
-| MinIO Console | http://localhost:9001 |
-| MinIO API | http://localhost:9000 |
-| MySQL | localhost:3306 |
-| Redis | localhost:6379 |
+| phpMyAdmin | http://127.0.0.1:8003 |
+| MinIO Console | http://127.0.0.1:8004 |
+| MinIO API | http://127.0.0.1:8005 |
+| MySQL | 127.0.0.1:8006 |
+| Redis | 127.0.0.1:8007 |
 
 ## Backup Database
 

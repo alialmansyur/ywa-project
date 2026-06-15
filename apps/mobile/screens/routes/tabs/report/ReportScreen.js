@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
 import { Button } from '../../../../components/common/Button';
@@ -15,6 +16,7 @@ import { getCurrentMonthRange } from '../../../../utils/dateRange';
 import { AssetPickerField } from '../../../../components/common/AssetPickerField';
 
 export default function ReportScreen() {
+  const params = useLocalSearchParams();
   const { showAlert } = useAlert();
   const { activeAsset, loadCurrentAssignment } = useActiveAssetStore();
   const { user } = useAuthStore();
@@ -29,21 +31,37 @@ export default function ReportScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const monthRange = getCurrentMonthRange();
   const [filters, setFilters] = useState({ search: '', from: monthRange.from, to: monthRange.to });
+  const highlightedReportId = String(params?.report_id || '').trim();
 
   const loadHistory = useCallback(async () => {
     try {
       const effectiveAsset = requiresAssignedAssetRole ? activeAsset : selectedAsset;
       const res = await breakdownReportService.list({ 
         assetId: effectiveAsset?.id,
+        mine: highlightedReportId ? false : true,
         search: filters.search,
         from: filters.from,
         to: filters.to
       });
-      setHistory(res?.data || []);
+      let nextHistory = res?.data || [];
+
+      if (highlightedReportId) {
+        try {
+          const highlightedRow = await breakdownReportService.getById(highlightedReportId);
+          nextHistory = [
+            highlightedRow,
+            ...nextHistory.filter((item) => String(item?.id) !== highlightedReportId),
+          ];
+        } catch (_error) {
+          // no-op, fallback to list
+        }
+      }
+
+      setHistory(nextHistory);
     } catch (_e) {
       setHistory([]);
     }
-  }, [activeAsset, filters, requiresAssignedAssetRole, selectedAsset]);
+  }, [activeAsset, filters, highlightedReportId, requiresAssignedAssetRole, selectedAsset]);
 
   useEffect(() => {
     const load = async () => {
@@ -74,6 +92,12 @@ export default function ReportScreen() {
     }
     loadHistory();
   }, [activeAsset, activeAsset?.id, loadHistory]);
+
+  useEffect(() => {
+    if (highlightedReportId) {
+      setActiveTab('riwayat');
+    }
+  }, [highlightedReportId]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -179,7 +203,7 @@ export default function ReportScreen() {
     <View style={styles.listContainer}>
       <SearchFilterPanel placeholder="Cari laporan breakdown..." onFilter={(f) => setFilters((prev) => ({ ...prev, ...f }))} />
       {history.map((item) => (
-        <Card key={item.id} style={[styles.formCard, { margin: 0, marginBottom: theme.spacing.sm }]}>
+        <Card key={item.id} style={[styles.formCard, { margin: 0, marginBottom: theme.spacing.sm }, String(item.id) === highlightedReportId && styles.highlightedCard]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}><Text style={styles.labelHeader}>{item.report_no}</Text><Badge text={(item.status || 'submitted').toUpperCase()} variant={item.status === 'processed' ? 'success' : 'warning'} /></View>
           <Text style={{ ...theme.typography.body, color: theme.colors.text }}>{item.description}</Text>
           <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 8 }}>{String(item.created_at || '').slice(0, 10)}</Text>
@@ -207,4 +231,4 @@ export default function ReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, header: { padding: theme.spacing.xl, alignItems: 'center', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border }, icon: { marginBottom: theme.spacing.sm }, title: { ...theme.typography.h2, color: theme.colors.text, textAlign: 'center', marginBottom: theme.spacing.xs }, subtitle: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 }, tabContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, paddingTop: theme.spacing.sm }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: '#fff' }, tabText: { ...theme.typography.body, fontWeight: '600', color: 'rgba(255,255,255,0.7)' }, tabTextActive: { color: '#fff' }, content: { flex: 1 }, formArea: { padding: theme.spacing.md }, listContainer: { padding: theme.spacing.md }, formCard: { margin: theme.spacing.md, padding: theme.spacing.lg, marginBottom: 0 }, label: { ...theme.typography.h3, color: theme.colors.text, marginBottom: theme.spacing.sm, marginTop: theme.spacing.md }, labelHeader: { ...theme.typography.h3, color: theme.colors.text }, input: { ...theme.typography.body, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, backgroundColor: theme.colors.background }, locationBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing.md, borderRadius: theme.borderRadius.md, marginBottom: theme.spacing.xl }, locationText: { ...theme.typography.body, color: theme.colors.textSecondary, marginLeft: theme.spacing.sm }, submitBtn: { marginTop: theme.spacing.lg }, historyDate: { ...theme.typography.caption, color: theme.colors.textSecondary, flex: 1 } });
+const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, header: { padding: theme.spacing.xl, alignItems: 'center', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border }, icon: { marginBottom: theme.spacing.sm }, title: { ...theme.typography.h2, color: theme.colors.text, textAlign: 'center', marginBottom: theme.spacing.xs }, subtitle: { ...theme.typography.body, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 }, tabContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, paddingTop: theme.spacing.sm }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: '#fff' }, tabText: { ...theme.typography.body, fontWeight: '600', color: 'rgba(255,255,255,0.7)' }, tabTextActive: { color: '#fff' }, content: { flex: 1 }, formArea: { padding: theme.spacing.md }, listContainer: { padding: theme.spacing.md }, formCard: { margin: theme.spacing.md, padding: theme.spacing.lg, marginBottom: 0 }, highlightedCard: { borderWidth: 1, borderColor: theme.colors.primary }, label: { ...theme.typography.h3, color: theme.colors.text, marginBottom: theme.spacing.sm, marginTop: theme.spacing.md }, labelHeader: { ...theme.typography.h3, color: theme.colors.text }, input: { ...theme.typography.body, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, backgroundColor: theme.colors.background }, locationBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing.md, borderRadius: theme.borderRadius.md, marginBottom: theme.spacing.xl }, locationText: { ...theme.typography.body, color: theme.colors.textSecondary, marginLeft: theme.spacing.sm }, submitBtn: { marginTop: theme.spacing.lg }, historyDate: { ...theme.typography.caption, color: theme.colors.textSecondary, flex: 1 } });

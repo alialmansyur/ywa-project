@@ -1,9 +1,10 @@
 import apiClient from './api';
 
 export const workshopService = {
-  controlTowerWorkOrders: async () => (await apiClient.get('/workshop-control-tower/work-orders')).data,
-  controlTowerApprovalQueue: async () => (await apiClient.get('/workshop-control-tower/approval-queue')).data,
-  controlTowerStepQueues: async () => (await apiClient.get('/workshop-control-tower/step-queues')).data,
+  controlTowerWorkOrders: async (params = {}) => (await apiClient.get('/workshop-control-tower/work-orders', { params })).data,
+  controlTowerApprovalQueue: async (params = {}) => (await apiClient.get('/workshop-control-tower/approval-queue', { params })).data,
+  controlTowerStepQueues: async (params = {}) => (await apiClient.get('/workshop-control-tower/step-queues', { params })).data,
+  controlTowerBottlenecks: async (params = {}) => (await apiClient.get('/workshop-control-tower/bottlenecks', { params })).data,
   processTimeline: async (workOrderId) => (await apiClient.get(`/work-orders/${workOrderId}/timeline`)).data,
   processData: async (workOrderId) => (await apiClient.get(`/work-orders/${workOrderId}/process`)).data,
   startProcess: async (workOrderId) => (await apiClient.post(`/work-orders/${workOrderId}/process/start`)).data,

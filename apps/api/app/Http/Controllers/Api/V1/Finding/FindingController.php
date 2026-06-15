@@ -155,7 +155,7 @@ class FindingController extends Controller
             return $finding;
         });
 
-        NotificationDispatcherService::dispatchToAdmins(
+        NotificationDispatcherService::dispatchToNonOperators(
             'Temuan Baru Masuk',
             'Temuan ' . $finding->code . ' menunggu tindak lanjut.',
             NotificationDispatcherService::buildRouteTargetPayload([

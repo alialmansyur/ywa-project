@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
 import { HeaderBackButton } from '../../../../components/common/HeaderBackButton';
 import { ShieldCheck } from 'lucide-react-native';
 import { scheduleService } from '../../../../services/schedule.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 
 export default function PreventiveScreen() {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState([]);
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   useEffect(() => {
     const load = async () => {
@@ -25,7 +28,7 @@ export default function PreventiveScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: menuBarContentPadding }}>
       <Stack.Screen options={{ title: 'Cek Preventive', headerShown: true, headerStyle: { backgroundColor: theme.colors.primary }, headerTintColor: '#fff', headerBackVisible: false, headerBackTitleVisible: false, headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <View style={styles.header}><ShieldCheck size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} /><Text style={styles.title}>Preventive Maintenance</Text><Text style={styles.subtitle}>Jadwal preventive 30 hari ke depan berdasarkan data sistem.</Text></View>
       <View style={styles.content}>

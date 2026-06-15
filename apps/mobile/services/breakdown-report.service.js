@@ -8,6 +8,11 @@ export const breakdownReportService = {
     return response.data;
   },
 
+  getById: async (id) => {
+    const response = await apiClient.get(`/breakdown-reports/${id}`);
+    return response.data;
+  },
+
   create: async ({ assetId, description, locationLabel }) => {
     const response = await apiClient.post('/breakdown-reports', {
       asset_id: String(assetId),

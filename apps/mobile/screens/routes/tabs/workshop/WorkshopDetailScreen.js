@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -8,7 +9,7 @@ import { HeaderBackButton } from '../../../../components/common/HeaderBackButton
 import { Clock, Truck, CheckCircle2, CircleDashed } from 'lucide-react-native';
 import { workshopService } from '../../../../services/workshop.service';
 import { workOrdersService } from '../../../../services/work-orders.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 
 const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 
@@ -27,11 +28,13 @@ const DEFAULT_STATIONS = [
 ];
 
 export default function WorkshopDetail() {
+  const insets = useSafeAreaInsets();
   const { work_order_id } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
   const [stations, setStations] = useState(DEFAULT_STATIONS);
   const [header, setHeader] = useState({ asset: '-', desc: '-', status: '-', timeIn: '-', downtime: '-' });
   const [progress, setProgress] = useState({ doneSteps: 0, totalSteps: 9, ratio: 0 });
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   const load = useCallback(async () => {
     if (!work_order_id) return;
@@ -94,7 +97,7 @@ export default function WorkshopDetail() {
 
   return (
     <View style={styles.container}>
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: menuBarContentPadding }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
       <Stack.Screen
         options={{
           title: 'Progress Workshop',

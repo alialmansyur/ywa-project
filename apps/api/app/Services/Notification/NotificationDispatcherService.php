@@ -3,6 +3,7 @@
 namespace App\Services\Notification;
 
 use App\Jobs\SendPushNotificationJob;
+use App\Models\AssetAssignment;
 use App\Models\AppNotification;
 use App\Models\User;
 use App\Models\WorkOrder;
@@ -58,7 +59,40 @@ class NotificationDispatcherService
 
     public static function dispatchToAdmins(string $title, string $body, array $data = [], string $type = 'system'): void
     {
-        self::dispatchToRoles(['admin', 'superadmin'], $title, $body, $data, $type);
+        self::dispatchToRoles(['admin', 'super_admin'], $title, $body, $data, $type);
+    }
+
+    public static function dispatchToNonOperators(string $title, string $body, array $data = [], string $type = 'system'): void
+    {
+        try {
+            $targets = User::query()
+                ->where('is_active', true)
+                ->whereHas('roles', fn ($query) => $query->where('name', '!=', 'operator'))
+                ->get(['id']);
+
+            self::dispatchToTargets($targets, $title, $body, $data, $type);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch non-operator notification: ' . $e->getMessage());
+        }
+    }
+
+    public static function dispatchToCurrentAssetHolder(int $assetId, string $title, string $body, array $data = [], string $type = 'system'): void
+    {
+        try {
+            $assignment = AssetAssignment::query()
+                ->where('asset_id', $assetId)
+                ->whereNull('released_at')
+                ->latest('assigned_at')
+                ->first(['user_id']);
+
+            if (! $assignment?->user_id) {
+                return;
+            }
+
+            self::dispatchToUser((int) $assignment->user_id, $title, $body, $data, $type);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch asset holder notification: ' . $e->getMessage());
+        }
     }
 
     public static function dispatchToUser(int $userId, string $title, string $body, array $data = [], string $type = 'system'): void
@@ -69,22 +103,7 @@ class NotificationDispatcherService
                 return;
             }
 
-            $notification = AppNotification::query()->create([
-                'user_id' => $target->id,
-                'type' => $type,
-                'title' => $title,
-                'body' => $body,
-                'data' => $data,
-                'is_read' => false,
-            ]);
-
-            SendPushNotificationJob::dispatch(
-                (int) $target->id,
-                (int) $notification->id,
-                $title,
-                $body,
-                $data,
-            );
+            self::dispatchToTargets(collect([$target]), $title, $body, $data, $type);
         } catch (\Throwable $e) {
             Log::warning('Failed to dispatch user notification: ' . $e->getMessage());
         }
@@ -98,24 +117,7 @@ class NotificationDispatcherService
                 ->where('is_active', true)
                 ->get(['id']);
 
-            foreach ($targets as $target) {
-                $notification = AppNotification::query()->create([
-                    'user_id' => $target->id,
-                    'type' => $type,
-                    'title' => $title,
-                    'body' => $body,
-                    'data' => $data,
-                    'is_read' => false,
-                ]);
-
-                SendPushNotificationJob::dispatch(
-                    (int) $target->id,
-                    (int) $notification->id,
-                    $title,
-                    $body,
-                    $data,
-                );
-            }
+            self::dispatchToTargets($targets, $title, $body, $data, $type);
         } catch (\Throwable $e) {
             Log::warning('Failed to dispatch role notification: ' . $e->getMessage());
         }
@@ -187,16 +189,29 @@ class NotificationDispatcherService
     private function buildMessage(WorkOrder $workOrder, string $eventKey, array $meta): array
     {
         $woCode = $workOrder->code ?? ('WO-' . $workOrder->id);
-        $step = $meta['step_name'] ?? ('Step ' . ($meta['step_order'] ?? '-'));
+        $stepOrder = $meta['source_step_order'] ?? $meta['target_step_order'] ?? $meta['step_order'] ?? '-';
+        $step = $meta['step_name'] ?? ('Step ' . $stepOrder);
 
         return match ($eventKey) {
             'PROCESS_STARTED' => [
                 "Process Dimulai - {$woCode}",
                 "Work order {$woCode} telah memasuki proses workshop.",
             ],
+            'STEP_IN' => [
+                "Step Dimulai - {$woCode}",
+                "{$step} pada {$woCode} telah mulai dikerjakan.",
+            ],
+            'STEP_OUT' => [
+                "Step Selesai - {$woCode}",
+                "{$step} pada {$woCode} telah diselesaikan.",
+            ],
             'STEP_HOLD' => [
                 "Step Hold - {$woCode}",
                 "{$step} pada {$woCode} di-hold. Segera lakukan follow-up.",
+            ],
+            'STEP_RESUME' => [
+                "Step Dilanjutkan - {$woCode}",
+                "{$step} pada {$woCode} kembali dilanjutkan.",
             ],
             'STEP_REJECTED' => [
                 "Step Ditolak - {$woCode}",
@@ -221,7 +236,7 @@ class NotificationDispatcherService
     {
         return match ($eventKey) {
             'STEP_HOLD', 'STEP_REJECTED' => 'high',
-            'PROCESS_STARTED', 'STEP_APPROVED' => 'medium',
+            'PROCESS_STARTED', 'STEP_IN', 'STEP_OUT', 'STEP_RESUME', 'STEP_APPROVED', 'PROCESS_COMPLETED' => 'medium',
             default => 'low',
         };
     }
@@ -230,7 +245,10 @@ class NotificationDispatcherService
     {
         return in_array($eventKey, [
             'PROCESS_STARTED',
+            'STEP_IN',
+            'STEP_OUT',
             'STEP_HOLD',
+            'STEP_RESUME',
             'STEP_REJECTED',
             'STEP_APPROVED',
             'PROCESS_COMPLETED',
@@ -241,7 +259,10 @@ class NotificationDispatcherService
     {
         return in_array($eventKey, [
             'PROCESS_STARTED',
+            'STEP_IN',
+            'STEP_OUT',
             'STEP_HOLD',
+            'STEP_RESUME',
             'STEP_REJECTED',
             'STEP_APPROVED',
             'PROCESS_COMPLETED',
@@ -253,18 +274,42 @@ class NotificationDispatcherService
      */
     private function resolveTargets(WorkOrder $workOrder, string $eventKey, ?User $actor): Collection
     {
-        $targetIds = collect([
-            $workOrder->created_by,
-            $workOrder->supervisor_id,
-            $workOrder->approved_by,
-        ])->filter();
+        $targetIds = collect();
 
-        $assigneeIds = $workOrder->assignees()->pluck('users.id');
-        $targetIds = $targetIds->merge($assigneeIds);
+        if (in_array($eventKey, ['PROCESS_STARTED', 'STEP_HOLD', 'STEP_REJECTED', 'STEP_APPROVED', 'PROCESS_COMPLETED'], true)) {
+            $targetIds = $targetIds->merge([
+                $workOrder->created_by,
+                $workOrder->supervisor_id,
+                $workOrder->approved_by,
+            ]);
 
-        if (in_array($eventKey, ['STEP_HOLD', 'STEP_REJECTED'], true)) {
-            $approverIds = User::permission('approve work-orders')->pluck('id');
-            $targetIds = $targetIds->merge($approverIds);
+            $assigneeIds = $workOrder->assignees()->pluck('users.id');
+            $targetIds = $targetIds->merge($assigneeIds);
+
+            if (in_array($eventKey, ['STEP_HOLD', 'STEP_REJECTED'], true)) {
+                $approverIds = User::permission('approve work-orders')->pluck('id');
+                $targetIds = $targetIds->merge($approverIds);
+            }
+        }
+
+        if (in_array($eventKey, [
+            'PROCESS_STARTED',
+            'STEP_IN',
+            'STEP_OUT',
+            'STEP_HOLD',
+            'STEP_RESUME',
+            'STEP_REJECTED',
+            'STEP_APPROVED',
+            'PROCESS_COMPLETED',
+        ], true)) {
+            $operatorCreatorId = User::query()
+                ->where('id', $workOrder->created_by)
+                ->role('operator')
+                ->value('id');
+
+            if ($operatorCreatorId) {
+                $targetIds->push($operatorCreatorId);
+            }
         }
 
         if ($actor?->id) {
@@ -280,5 +325,27 @@ class NotificationDispatcherService
             ->whereIn('id', $ids)
             ->where('is_active', true)
             ->get(['id', 'name']);
+    }
+
+    private static function dispatchToTargets(Collection $targets, string $title, string $body, array $data = [], string $type = 'system'): void
+    {
+        foreach ($targets->unique(fn ($target) => (int) $target->id)->values() as $target) {
+            $notification = AppNotification::query()->create([
+                'user_id' => $target->id,
+                'type' => $type,
+                'title' => $title,
+                'body' => $body,
+                'data' => $data,
+                'is_read' => false,
+            ]);
+
+            SendPushNotificationJob::dispatch(
+                (int) $target->id,
+                (int) $notification->id,
+                $title,
+                $body,
+                $data,
+            );
+        }
     }
 }

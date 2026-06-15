@@ -24,6 +24,10 @@ import {
   Sun,
   QrCode,
   AlertTriangle,
+  Activity,
+  Workflow,
+  Siren,
+  Layers3,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
@@ -113,6 +117,8 @@ const ACTIVE_WORK_ORDER_STATUSES = ['registered', 'triage', 'pending', 'approved
 export default function DashboardScreen() {
   const hasLoadedRef = useRef(false);
   const [overview, setOverview] = useState(null);
+  const [workshopPanel, setWorkshopPanel] = useState(null);
+  const [nonOperatorInsights, setNonOperatorInsights] = useState(null);
   const { activeAsset, loadCurrentAssignment } = useActiveAssetStore();
   const { user } = useAuthStore();
 
@@ -168,16 +174,89 @@ export default function DashboardScreen() {
 
   const normalizedRole = String(user?.role || '').toLowerCase();
   const isOperatorRole = normalizedRole.includes('operator');
+  const headerBackground = theme.colors.primary;
+  const workshopHomeRoute = isOperatorRole ? '/(tabs)/workshop' : '/(tabs)/mechanic';
 
   const loadDashboard = React.useCallback(async () => {
     try {
       const assignment = await loadCurrentAssignment().catch(() => null);
       const assignedAssetId = String(assignment?.asset?.id || activeAsset?.id || '');
-      const [dashboard, woRes] = await Promise.all([
+      const baseRequests = [
         dashboardService.overview(),
         workOrdersService.getAll(1, 100),
+      ];
+      const extraRequests = isOperatorRole
+        ? []
+        : [
+            dashboardService.workshopOperationalSummary(),
+            workshopService.controlTowerApprovalQueue({ per_page: 100 }),
+            workshopService.controlTowerStepQueues(),
+            workshopService.controlTowerWorkOrders({ per_page: 100 }),
+            workshopService.controlTowerBottlenecks(),
+          ];
+      const [dashboard, woRes, workshopSummary, approvalQueue, stepQueues, controlTowerRows, bottlenecks] = await Promise.all([
+        ...baseRequests,
+        ...extraRequests,
       ]);
       setOverview(dashboard);
+      if (!isOperatorRole) {
+        const approvalItems = Array.isArray(approvalQueue?.data) ? approvalQueue.data : Array.isArray(approvalQueue?.items) ? approvalQueue.items : [];
+        const approvalCount = Number(approvalQueue?.total ?? approvalItems.length ?? 0);
+        const queueGroups = stepQueues && typeof stepQueues === 'object' ? Object.values(stepQueues) : [];
+        const queueItems = queueGroups.reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+        const workOrderRows = Array.isArray(controlTowerRows) ? controlTowerRows : Array.isArray(controlTowerRows?.data) ? controlTowerRows.data : Array.isArray(controlTowerRows?.items) ? controlTowerRows.items : [];
+        const bayCounts = workOrderRows.reduce((acc, row) => {
+          const key = String(row?.current_bay || 'waiting_bay');
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        const workloadDistribution = Object.entries(bayCounts)
+          .map(([bay, total]) => ({
+            bay,
+            label: String(bay).replaceAll('_', ' ').replace(/\b\w/g, (x) => x.toUpperCase()),
+            total: Number(total || 0),
+          }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 3);
+        const warningItems = [
+          approvalCount > 0 ? `${approvalCount} approval menunggu triage.` : null,
+          Number(workshopSummary?.wo_hold_total || 0) > 0 ? `${workshopSummary.wo_hold_total} WO masih hold.` : null,
+          Number(workshopSummary?.late_steps_total || 0) > 0 ? `${workshopSummary.late_steps_total} step melewati SLA hari ini.` : null,
+          Number(dashboard?.overdue_work_orders || 0) > 0 ? `${dashboard.overdue_work_orders} WO overdue perlu follow-up.` : null,
+          Number(queueItems || 0) >= 10 ? `Antrian step aktif mencapai ${queueItems} item.` : null,
+        ].filter(Boolean).slice(0, 3);
+        const quickLinks = [
+          { key: 'approval', label: 'Approval', value: approvalCount, route: '/(tabs)/mechanic?tab=approval', color: theme.colors.warning },
+          { key: 'queue', label: 'WO Aktif', value: Number(workshopSummary?.wo_active_total ?? 0), route: '/(tabs)/mechanic?tab=queue', color: theme.colors.primary },
+          { key: 'hold', label: 'WO Hold', value: Number(workshopSummary?.wo_hold_total ?? 0), route: '/(tabs)/mechanic?tab=queue', color: theme.colors.error },
+          { key: 'history', label: 'Riwayat', value: Number(workshopSummary?.wo_completed_today ?? 0), route: '/(tabs)/mechanic?tab=history', color: theme.colors.success },
+        ];
+        const bottleneckStep = String(bottlenecks?.step || bottlenecks?.summary?.step || '-');
+        const topBay = Array.isArray(bottlenecks?.top_bay_by_queue) ? bottlenecks.top_bay_by_queue[0] : null;
+        setWorkshopPanel({
+          activeWo: Number(workshopSummary?.wo_active_total ?? dashboard?.active_work_orders ?? 0),
+          holdWo: Number(workshopSummary?.wo_hold_total ?? 0),
+          completedToday: Number(workshopSummary?.wo_completed_today ?? 0),
+          approvalCount,
+          queueCount: queueItems,
+          attentionCount: Number(workshopSummary?.late_steps_total ?? workshopSummary?.downtime_today_minutes ?? 0),
+          attentionLabel: Number(workshopSummary?.late_steps_total ?? 0) > 0 ? 'Late Step Hari Ini' : 'Downtime Hari Ini',
+        });
+        setNonOperatorInsights({
+          approvalCount,
+          warningItems,
+          quickLinks,
+          bottleneckStep,
+          bottleneckLate: Number(bottlenecks?.late ?? bottlenecks?.summary?.late ?? 0),
+          bottleneckHold: Number(bottlenecks?.hold ?? bottlenecks?.summary?.hold ?? 0),
+          topBayLabel: topBay?.bay_in ? String(topBay.bay_in).replaceAll('_', ' ').replace(/\b\w/g, (x) => x.toUpperCase()) : '-',
+          topBayQueueMinutes: Number(topBay?.avg_queue_minutes ?? 0),
+          workloadDistribution,
+        });
+      } else {
+        setWorkshopPanel(null);
+        setNonOperatorInsights(null);
+      }
 
       setLoadingTodayWo(true);
       const todayKey = toDateKey(new Date());
@@ -237,6 +316,8 @@ export default function DashboardScreen() {
       setTodayWo(activeToday[0] || fallbackActive[0] || null);
     } catch (_e) {
       setOverview(null);
+      setWorkshopPanel(null);
+      setNonOperatorInsights(null);
       setTodayWo(null);
       setMenuWorkOrderBadgeCount(0);
     } finally {
@@ -271,12 +352,27 @@ export default function DashboardScreen() {
     }, [loadDashboard]),
   );
 
-  const gridMenu = useMemo(() => menuKeys.map((k) => MENU_MAP[k]).filter(Boolean), [menuKeys]);
+  const gridMenu = useMemo(
+    () => menuKeys
+      .map((k) => {
+        const menu = MENU_MAP[k];
+        if (!menu) return null;
+        if (k === 'workshop') {
+          return { ...menu, route: workshopHomeRoute };
+        }
+        return menu;
+      })
+      .filter(Boolean),
+    [menuKeys, workshopHomeRoute],
+  );
   const woActive = overview?.active_work_orders ?? 0;
   const safetyScore = overview?.p2h_today?.compliance_pct;
   const incidentFree = overview?.mttr_minutes_month;
   const priorityBadgeCount = Number(menuWorkOrderBadgeCount || 0);
   const breakdownBadgeCount = Number(overview?.breakdown_today ?? 0);
+  const workshopAttentionValue = workshopPanel?.attentionCount ?? 0;
+  const workshopAttentionSuffix = workshopPanel?.attentionLabel === 'Downtime Hari Ini' ? ' mnt' : '';
+  const nonOperatorWarnings = nonOperatorInsights?.warningItems || [];
 
   const dueText = todayWo?.scheduled_end
     ? new Date(todayWo.scheduled_end).toLocaleString('id-ID')
@@ -300,7 +396,7 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollArea}>
-        <Animated.View style={[styles.header, { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
+        <Animated.View style={[styles.header, { backgroundColor: headerBackground, opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
           <View style={styles.headerOrbA} />
           <View style={styles.headerOrbB} />
           <Text style={styles.greeting}>{greeting}</Text>
@@ -326,26 +422,67 @@ export default function DashboardScreen() {
 
         <Animated.View style={[styles.assetContainer, { opacity: assetAnim, transform: [{ translateY: assetAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
           <Card style={styles.assetCard}>
-            <View style={styles.assetHeader}>
-              <View style={styles.assetHeaderLeft}>
-                <Settings color={theme.colors.error} size={24} />
-                <Text style={styles.assetTitle}>Aset Digunakan</Text>
-              </View>
-              <PulseBadge text={activeAsset ? (activeAsset.status || 'ACTIVE').toUpperCase() : 'UNASSIGNED'} />
-            </View>
-            <Text style={styles.assetMetaText}>No. Polisi: {activeAsset?.plateNo || '-'}</Text>
-            <Text style={styles.assetNameText}>
-              {activeAsset ? `${activeAsset.name} (${activeAsset.code})` : 'Belum ada aset di-assign'}
-            </Text>
-            <View style={styles.hmRow}>
-              <View>
-                <Text style={styles.hmHeroLabel}>HM Saat Ini</Text>
-                <Text style={styles.hmHeroValue}>{activeAsset?.hm ?? '-'}</Text>
-              </View>
-              <TouchableOpacity style={styles.assetPrimaryAction} onPress={() => router.push('/(tabs)/unit-assets')}>
-                <Text style={styles.assetPrimaryActionText}>{activeAsset ? 'Kelola Aset' : 'Assign Aset'}</Text>
-              </TouchableOpacity>
-            </View>
+            {isOperatorRole ? (
+              <>
+                <View style={styles.assetHeader}>
+                  <View style={styles.assetHeaderLeft}>
+                    <Settings color={theme.colors.error} size={24} />
+                    <Text style={styles.assetTitle}>Aset Digunakan</Text>
+                  </View>
+                  <PulseBadge text={activeAsset ? (activeAsset.status || 'ACTIVE').toUpperCase() : 'UNASSIGNED'} />
+                </View>
+                <Text style={styles.assetMetaText}>No. Polisi: {activeAsset?.plateNo || '-'}</Text>
+                <Text style={styles.assetNameText}>
+                  {activeAsset ? `${activeAsset.name} (${activeAsset.code})` : 'Belum ada aset di-assign'}
+                </Text>
+                <View style={styles.hmRow}>
+                  <View>
+                    <Text style={styles.hmHeroLabel}>HM Saat Ini</Text>
+                    <Text style={styles.hmHeroValue}>{activeAsset?.hm ?? '-'}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.assetPrimaryAction} onPress={() => router.push('/(tabs)/unit-assets')}>
+                    <Text style={styles.assetPrimaryActionText}>{activeAsset ? 'Kelola Aset' : 'Assign Aset'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.assetHeader}>
+                  <View style={styles.assetHeaderLeft}>
+                    <Wrench color={theme.colors.primary} size={24} />
+                    <Text style={styles.assetTitle}>Panel Workshop</Text>
+                  </View>
+                  <PulseBadge text={`${workshopPanel?.approvalCount ?? 0} Approval`} />
+                </View>
+                <View style={styles.workshopSummaryGrid}>
+                  <View style={styles.workshopSummaryItem}>
+                    <Text style={styles.assetMetaText}>WO Aktif</Text>
+                    <Text style={styles.workshopSummaryValue}>{workshopPanel?.activeWo ?? 0}</Text>
+                  </View>
+                  <View style={styles.workshopSummaryItem}>
+                    <Text style={styles.assetMetaText}>WO Hold</Text>
+                    <Text style={styles.workshopSummaryValue}>{workshopPanel?.holdWo ?? 0}</Text>
+                  </View>
+                  <View style={styles.workshopSummaryItem}>
+                    <Text style={styles.assetMetaText}>Selesai Hari Ini</Text>
+                    <Text style={styles.workshopSummaryValue}>{workshopPanel?.completedToday ?? 0}</Text>
+                  </View>
+                  <View style={styles.workshopSummaryItem}>
+                    <Text style={styles.assetMetaText}>Queue Step Aktif</Text>
+                    <Text style={styles.workshopSummaryValue}>{workshopPanel?.queueCount ?? 0}</Text>
+                  </View>
+                </View>
+                <View style={styles.hmRow}>
+                  <View>
+                    <Text style={styles.hmHeroLabel}>{workshopPanel?.attentionLabel || 'Late Step Hari Ini'}</Text>
+                    <Text style={styles.hmHeroValue}>{`${workshopAttentionValue}${workshopAttentionSuffix}`}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.assetPrimaryAction} onPress={() => router.push(workshopHomeRoute)}>
+                    <Text style={styles.assetPrimaryActionText}>Buka Workshop</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </Card>
         </Animated.View>
 
@@ -367,6 +504,116 @@ export default function DashboardScreen() {
         </Animated.View>
 
         <Animated.View style={{ opacity: sectionAnim, transform: [{ translateY: sectionAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>
+          {!isOperatorRole ? (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Quick Navigation</Text>
+                <View style={styles.quickLinkRow}>
+                  {(nonOperatorInsights?.quickLinks || []).map((item) => (
+                    <TouchableOpacity key={item.key} style={styles.quickLinkItem} activeOpacity={0.85} onPress={() => router.push(item.route)}>
+                      <View style={[styles.quickLinkIcon, { backgroundColor: `${item.color}15` }]}>
+                        <Text style={[styles.quickLinkValue, { color: item.color }]}>{item.value}</Text>
+                      </View>
+                      <Text style={styles.quickLinkLabel}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Approval Spotlight</Text>
+                <Card style={styles.insightCard}>
+                  <View style={styles.insightHeader}>
+                    <View style={styles.insightHeaderLeft}>
+                      <Siren size={20} color={theme.colors.warning} />
+                      <Text style={styles.insightTitle}>Menunggu Approval</Text>
+                    </View>
+                    <PulseBadge text={`${nonOperatorInsights?.approvalCount ?? 0} Pending`} />
+                  </View>
+                  <Text style={styles.insightPrimaryValue}>{nonOperatorInsights?.approvalCount ?? 0}</Text>
+                  <Text style={styles.insightDescription}>
+                    {Number(nonOperatorInsights?.approvalCount || 0) > 0
+                      ? 'Ada work order baru yang menunggu triage untuk diproses.'
+                      : 'Saat ini tidak ada approval yang tertahan.'}
+                  </Text>
+                  <TouchableOpacity style={styles.inlineAction} onPress={() => router.push('/(tabs)/mechanic?tab=approval')}>
+                    <Text style={styles.inlineActionText}>Buka Approval Queue</Text>
+                  </TouchableOpacity>
+                </Card>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Warning & Exceptions</Text>
+                <Card style={styles.insightCard}>
+                  <View style={styles.insightHeader}>
+                    <View style={styles.insightHeaderLeft}>
+                      <AlertTriangle size={20} color={theme.colors.error} />
+                      <Text style={styles.insightTitle}>Butuh Perhatian</Text>
+                    </View>
+                    <Badge text={`${nonOperatorWarnings.length} item`} variant={nonOperatorWarnings.length > 0 ? 'warning' : 'success'} />
+                  </View>
+                  {nonOperatorWarnings.length > 0 ? nonOperatorWarnings.map((item) => (
+                    <View key={item} style={styles.warningRow}>
+                      <View style={styles.warningDot} />
+                      <Text style={styles.warningText}>{item}</Text>
+                    </View>
+                  )) : <Text style={styles.insightDescription}>Tidak ada exception utama yang perlu diangkat saat ini.</Text>}
+                </Card>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Bottleneck Workshop</Text>
+                <View style={styles.dualCardRow}>
+                  <Card style={styles.dualInsightCard}>
+                    <View style={styles.insightHeaderLeft}>
+                      <Workflow size={18} color={theme.colors.primary} />
+                      <Text style={styles.insightMiniTitle}>Step Terpadat</Text>
+                    </View>
+                    <Text style={styles.dualInsightValue}>{nonOperatorInsights?.bottleneckStep ? String(nonOperatorInsights.bottleneckStep).replaceAll('_', ' ') : '-'}</Text>
+                    <Text style={styles.dualInsightMeta}>{nonOperatorInsights?.bottleneckLate ?? 0} late step</Text>
+                  </Card>
+                  <Card style={styles.dualInsightCard}>
+                    <View style={styles.insightHeaderLeft}>
+                      <Activity size={18} color={theme.colors.warning} />
+                      <Text style={styles.insightMiniTitle}>Bay Terpadat</Text>
+                    </View>
+                    <Text style={styles.dualInsightValue}>{nonOperatorInsights?.topBayLabel || '-'}</Text>
+                    <Text style={styles.dualInsightMeta}>{Math.round(nonOperatorInsights?.topBayQueueMinutes ?? 0)} menit avg queue</Text>
+                  </Card>
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Distribusi Workload</Text>
+                <Card style={styles.insightCard}>
+                  <View style={styles.insightHeader}>
+                    <View style={styles.insightHeaderLeft}>
+                      <Layers3 size={20} color={theme.colors.primary} />
+                      <Text style={styles.insightTitle}>Top Bay Aktif</Text>
+                    </View>
+                    <Badge text={`${nonOperatorInsights?.bottleneckHold ?? 0} Hold`} variant={nonOperatorInsights?.bottleneckHold ? 'warning' : 'success'} />
+                  </View>
+                  {(nonOperatorInsights?.workloadDistribution || []).map((row) => (
+                    <View key={row.bay} style={styles.workloadRow}>
+                      <Text style={styles.workloadLabel}>{row.label}</Text>
+                      <View style={styles.workloadBarTrack}>
+                        <View
+                          style={[
+                            styles.workloadBarFill,
+                            {
+                              width: `${Math.max(12, Math.min(100, ((row.total || 0) / Math.max(1, nonOperatorInsights.workloadDistribution[0]?.total || 1)) * 100))}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.workloadValue}>{row.total}</Text>
+                    </View>
+                  ))}
+                </Card>
+              </View>
+            </>
+          ) : null}
+
           <Text style={[styles.sectionTitle, { paddingHorizontal: theme.spacing.md }]}>My Performance & Stats</Text>
           <View style={styles.statsContainer}>
             <Card style={styles.statCard}>
@@ -435,7 +682,6 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1 },
   header: {
     padding: theme.spacing.lg,
-    backgroundColor: theme.colors.primary,
     paddingBottom: 48,
     overflow: 'hidden',
   },
@@ -496,6 +742,35 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   assetPrimaryActionText: { ...theme.typography.caption, color: '#fff', fontWeight: '700' },
+  workshopSummaryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: theme.spacing.xs },
+  workshopSummaryItem: { width: '50%', marginBottom: theme.spacing.sm },
+  workshopSummaryValue: { ...theme.typography.h3, color: theme.colors.primaryDark, marginTop: 2 },
+  quickLinkRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+  quickLinkItem: { width: '23%', alignItems: 'center' },
+  quickLinkIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  quickLinkValue: { ...theme.typography.caption, fontWeight: '700' },
+  quickLinkLabel: { ...theme.typography.caption, color: theme.colors.text, textAlign: 'center', fontWeight: '600' },
+  insightCard: { padding: theme.spacing.md },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.sm },
+  insightHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  insightTitle: { ...theme.typography.body, color: theme.colors.text, fontWeight: '700' },
+  insightMiniTitle: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '700', marginLeft: 6 },
+  insightPrimaryValue: { ...theme.typography.h1, color: theme.colors.primaryDark, fontSize: 32 },
+  insightDescription: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 4 },
+  inlineAction: { marginTop: theme.spacing.md, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, backgroundColor: `${theme.colors.primary}15`, borderRadius: theme.borderRadius.full },
+  inlineActionText: { ...theme.typography.caption, color: theme.colors.primary, fontWeight: '700' },
+  warningRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
+  warningDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.warning, marginTop: 5, marginRight: 8 },
+  warningText: { ...theme.typography.caption, color: theme.colors.textSecondary, flex: 1 },
+  dualCardRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dualInsightCard: { flex: 1, padding: theme.spacing.md, marginRight: 8 },
+  dualInsightValue: { ...theme.typography.h3, color: theme.colors.text, marginTop: theme.spacing.sm, textTransform: 'capitalize' },
+  dualInsightMeta: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 4 },
+  workloadRow: { flexDirection: 'row', alignItems: 'center', marginTop: theme.spacing.sm },
+  workloadLabel: { ...theme.typography.caption, color: theme.colors.text, width: 104 },
+  workloadBarTrack: { flex: 1, height: 10, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden', marginHorizontal: 8 },
+  workloadBarFill: { height: 10, backgroundColor: theme.colors.primary, borderRadius: 999 },
+  workloadValue: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '700', width: 24, textAlign: 'right' },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: theme.spacing.md, marginTop: theme.spacing.md, justifyContent: 'flex-start' },
   gridItem: { width: '25%', alignItems: 'center', marginBottom: theme.spacing.lg },
   iconContainer: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: theme.spacing.sm },

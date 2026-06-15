@@ -8,6 +8,11 @@ export const findingsService = {
     return response.data;
   },
 
+  getById: async (id) => {
+    const response = await apiClient.get(`/findings/${id}`);
+    return response.data;
+  },
+
   create: async ({ assetId, section, description, photo }) => {
     const formData = new FormData();
     formData.append('asset_id', String(assetId));

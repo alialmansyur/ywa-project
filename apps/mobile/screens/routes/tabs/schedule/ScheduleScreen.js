@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
 import { HeaderBackButton } from '../../../../components/common/HeaderBackButton';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
 import { scheduleService } from '../../../../services/schedule.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 
 const DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 export default function ScheduleScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState(new Date().getDate());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -36,10 +38,11 @@ export default function ScheduleScreen() {
   const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
   const selectedEvents = calendar.days?.[dateKey]?.count || 0;
   const selectedItems = calendar.events_by_day?.[dateKey] || [];
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: menuBarContentPadding }}>
         <Stack.Screen
           options={{
             title: 'Jadwal & Kalender',

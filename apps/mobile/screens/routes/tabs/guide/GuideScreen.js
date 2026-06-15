@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
 import { HeaderBackButton } from '../../../../components/common/HeaderBackButton';
 import { BookOpen } from 'lucide-react-native';
 import { guideService } from '../../../../services/guide.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 
 export default function GuideScreen() {
+  const insets = useSafeAreaInsets();
   const [guide, setGuide] = useState({ title: 'Buku Panduan', subtitle: '', sections: [] });
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   useEffect(() => {
     const load = async () => {
@@ -23,7 +26,7 @@ export default function GuideScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: menuBarContentPadding }}>
       <Stack.Screen options={{ title: 'Panduan Operasional', headerShown: true, headerStyle: { backgroundColor: theme.colors.primary }, headerTintColor: '#fff', headerBackVisible: false, headerBackTitleVisible: false, headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <View style={styles.header}><BookOpen size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} /><Text style={styles.title}>{guide.title || 'Buku Panduan'}</Text><Text style={styles.subtitle}>{guide.subtitle || 'Panduan operasional unit.'}</Text></View>
       <View style={styles.content}>{(guide.sections || []).map((section, idx) => <Card style={styles.card} key={section.id || idx}><Text style={styles.chapterTitle}>{section.title}</Text>{section.summary ? <Text style={[styles.paragraph, { marginBottom: theme.spacing.sm }]}>{section.summary}</Text> : null}<Text style={styles.paragraph}>{section.body || ''}</Text></Card>)}</View>

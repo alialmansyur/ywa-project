@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -14,7 +15,7 @@ import { workshopService } from '../../../../services/workshop.service';
 import { inventoryService } from '../../../../services/inventory.service';
 import { workOrdersService } from '../../../../services/work-orders.service';
 import { sendLocalNotification } from '../../../../utils/notifications';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { useMechanicAccessGuard } from '../../../../hooks/useMechanicAccessGuard';
 
 const STEP_CODES = [
@@ -56,6 +57,10 @@ const WASH_PRE_CONDITION_OPTIONS = [
 const WASH_POST_CONDITION_OPTIONS = [
   { label: 'OK', value: 'OK' },
   { label: 'Cuci Ulang', value: 'REWASH' },
+];
+const POST_WASH_ROUTE_OPTIONS = [
+  { label: 'Lanjut Perbaikan', value: 'CONTINUE_REPAIR' },
+  { label: 'Selesai', value: 'COMPLETE_AFTER_WASH' },
 ];
 const INSPECTION_RESULT_OPTIONS = [
   { label: 'Normal', value: 'NORMAL' },
@@ -127,10 +132,14 @@ const STEP_HELPER_COPY = {
   HANDOVER: 'Pilih status serah terima. Jika unit sudah diserahterimakan, isi nama penerimanya.',
 };
 
+const resolveErrorMessage = (error, fallback) => error?.message || error?.response?.data?.message || fallback;
+
 export default function MechanicProcessScreen() {
+  const insets = useSafeAreaInsets();
   const { isRestrictedRole } = useMechanicAccessGuard();
   const { work_order_id } = useLocalSearchParams();
   const { showAlert } = useAlert();
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -148,6 +157,7 @@ export default function MechanicProcessScreen() {
   const [finishForm, setFinishForm] = useState({
     pre_wash_condition: '',
     post_wash_condition: '',
+    post_wash_route: '',
     visual_note: '',
     inspection_result: '',
     work_plan: '',
@@ -328,6 +338,7 @@ export default function MechanicProcessScreen() {
     setFinishForm({
       pre_wash_condition: '',
       post_wash_condition: '',
+      post_wash_route: '',
       visual_note: '',
       inspection_result: '',
       work_plan: '',
@@ -358,34 +369,40 @@ export default function MechanicProcessScreen() {
     });
   };
 
-  const buildStationData = (stepCode) => {
+  const buildStationData = (stepCode, formValues = finishForm) => {
     switch (stepCode) {
       case 'WASHING_BAY':
-        return { step_code: stepCode, pre_wash_condition: finishForm.pre_wash_condition, post_wash_condition: finishForm.post_wash_condition, visual_note: finishForm.visual_note || null };
+        return {
+          step_code: stepCode,
+          pre_wash_condition: formValues.pre_wash_condition,
+          post_wash_condition: formValues.post_wash_condition,
+          post_wash_route: formValues.post_wash_route,
+          visual_note: formValues.visual_note || null,
+        };
       case 'INSPECTION_PKB':
-        return { step_code: stepCode, inspection_result: finishForm.inspection_result, work_plan: finishForm.work_plan, main_findings: finishForm.main_findings || null, action_estimate: finishForm.action_estimate || null };
+        return { step_code: stepCode, inspection_result: formValues.inspection_result, work_plan: formValues.work_plan, main_findings: formValues.main_findings || null, action_estimate: formValues.action_estimate || null };
       case 'CHECKING':
-        return { step_code: stepCode, checkpoint_result: finishForm.checkpoint_result, checking_summary: finishForm.checking_summary || null, proceed_status: finishForm.proceed_status || null };
+        return { step_code: stepCode, checkpoint_result: formValues.checkpoint_result, checking_summary: formValues.checking_summary || null, proceed_status: formValues.proceed_status || null };
       case 'WAITING_BAY':
-        return { step_code: stepCode, waiting_reason: finishForm.waiting_reason, waiting_type: finishForm.waiting_type || null, waiting_eta: finishForm.waiting_eta || null };
+        return { step_code: stepCode, waiting_reason: formValues.waiting_reason, waiting_type: formValues.waiting_type || null, waiting_eta: formValues.waiting_eta || null };
       case 'CREATE_WO':
-        return { step_code: stepCode, sap_reference_no: finishForm.sap_reference_no, admin_note: finishForm.admin_note || null, jobcard_confirmation: finishForm.jobcard_confirmation || null };
+        return { step_code: stepCode, sap_reference_no: formValues.sap_reference_no, admin_note: formValues.admin_note || null, jobcard_confirmation: formValues.jobcard_confirmation || null };
       case 'REPAIR':
-        return { step_code: stepCode, repair_action: finishForm.repair_action, technical_action: finishForm.technical_action || null, obstacle: finishForm.obstacle || null, hold_reason: finishForm.hold_reason || null };
+        return { step_code: stepCode, repair_action: formValues.repair_action, technical_action: formValues.technical_action || null, obstacle: formValues.obstacle || null, hold_reason: formValues.hold_reason || null };
       case 'QC':
-        return { step_code: stepCode, qc_result: finishForm.qc_result, qc_parameter: finishForm.qc_parameter || null, rework_note: finishForm.rework_note || null };
+        return { step_code: stepCode, qc_result: formValues.qc_result, qc_parameter: formValues.qc_parameter || null, rework_note: formValues.rework_note || null };
       case 'READY_BAY_CLOSE':
-        return { step_code: stepCode, closing_status: finishForm.closing_status, work_summary: finishForm.work_summary || null, document_completeness: finishForm.document_completeness || null };
+        return { step_code: stepCode, closing_status: formValues.closing_status, work_summary: formValues.work_summary || null, document_completeness: formValues.document_completeness || null };
       case 'HANDOVER':
-        return { step_code: stepCode, handover_confirmation: finishForm.handover_confirmation, receiver: finishForm.receiver || null, final_note: finishForm.final_note || null };
+        return { step_code: stepCode, handover_confirmation: formValues.handover_confirmation, receiver: formValues.receiver || null, final_note: formValues.final_note || null };
       default:
         return { step_code: stepCode, feedback: note || null };
     }
   };
 
-  const validateFinishForm = (stepCode) => {
+  const validateFinishForm = (stepCode, formValues = finishForm) => {
     const requiredMap = {
-      WASHING_BAY: ['pre_wash_condition', 'post_wash_condition'],
+      WASHING_BAY: ['pre_wash_condition', 'post_wash_condition', 'post_wash_route'],
       INSPECTION_PKB: ['inspection_result', 'work_plan'],
       CHECKING: ['checkpoint_result', 'proceed_status'],
       WAITING_BAY: ['waiting_reason', 'waiting_type'],
@@ -398,6 +415,7 @@ export default function MechanicProcessScreen() {
     const enumMap = {
       pre_wash_condition: WASH_PRE_CONDITION_OPTIONS.map((x) => x.value),
       post_wash_condition: WASH_POST_CONDITION_OPTIONS.map((x) => x.value),
+      post_wash_route: POST_WASH_ROUTE_OPTIONS.map((x) => x.value),
       inspection_result: INSPECTION_RESULT_OPTIONS.map((x) => x.value),
       work_plan: WORK_PLAN_OPTIONS.map((x) => x.value),
       checkpoint_result: OK_NG_OPTIONS.map((x) => x.value),
@@ -412,36 +430,36 @@ export default function MechanicProcessScreen() {
       handover_confirmation: HANDOVER_CONFIRMATION_OPTIONS.map((x) => x.value),
     };
     const requiredFields = requiredMap[stepCode] || [];
-    const missing = requiredFields.find((key) => !String(finishForm[key] || '').trim());
+    const missing = requiredFields.find((key) => !String(formValues[key] || '').trim());
     if (missing) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Field wajib pada form Finish belum lengkap.' });
       return false;
     }
     for (const [field, allowedValues] of Object.entries(enumMap)) {
-      const value = String(finishForm[field] || '').trim();
+      const value = String(formValues[field] || '').trim();
       if (!value) continue;
       if (!allowedValues.includes(value)) {
         showAlert({ type: 'warning', title: 'Perhatian', message: 'Ada pilihan form yang tidak valid. Silakan pilih dari opsi yang tersedia.' });
         return false;
       }
     }
-    if (stepCode === 'WASHING_BAY' && finishForm.post_wash_condition === 'REWASH' && !String(finishForm.visual_note || '').trim()) {
+    if (stepCode === 'WASHING_BAY' && formValues.post_wash_condition === 'REWASH' && !String(formValues.visual_note || '').trim()) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Catatan visual wajib diisi bila hasil cuci perlu diulang.' });
       return false;
     }
-    if (stepCode === 'CHECKING' && finishForm.checkpoint_result === 'NG' && !String(finishForm.checking_summary || '').trim()) {
+    if (stepCode === 'CHECKING' && formValues.checkpoint_result === 'NG' && !String(formValues.checking_summary || '').trim()) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Ringkasan temuan wajib diisi bila hasil checking NG.' });
       return false;
     }
-    if (stepCode === 'REPAIR' && ['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'].includes(String(finishForm.obstacle || '')) && !String(finishForm.hold_reason || '').trim()) {
+    if (stepCode === 'REPAIR' && ['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'].includes(String(formValues.obstacle || '')) && !String(formValues.hold_reason || '').trim()) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Detail kendala wajib diisi bila ada obstacle pada proses repair.' });
       return false;
     }
-    if (stepCode === 'QC' && String(finishForm.qc_result || '').toUpperCase() === 'NG' && !String(finishForm.rework_note || '').trim()) {
+    if (stepCode === 'QC' && String(formValues.qc_result || '').toUpperCase() === 'NG' && !String(formValues.rework_note || '').trim()) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Catatan rework wajib diisi bila hasil QC adalah NG.' });
       return false;
     }
-    if (stepCode === 'HANDOVER' && String(finishForm.handover_confirmation || '') === 'DISETERIMAKAN' && !String(finishForm.receiver || '').trim()) {
+    if (stepCode === 'HANDOVER' && String(formValues.handover_confirmation || '') === 'DISETERIMAKAN' && !String(formValues.receiver || '').trim()) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Nama penerima wajib diisi saat unit diserahterimakan.' });
       return false;
     }
@@ -455,14 +473,14 @@ export default function MechanicProcessScreen() {
       showAlert({ type: 'success', title: 'Berhasil', message: 'Process dimulai. Step logs terbuat.' });
       await loadData();
     } catch (e) {
-      const msg = e?.response?.data?.message || 'Gagal memulai process.';
+      const msg = resolveErrorMessage(e, 'Gagal memulai process.');
       showAlert({ type: 'error', title: 'Gagal', message: msg });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleAction = async (action) => {
+  const handleAction = async (action, options = {}) => {
     try {
       if (!work_order_id) return;
       setActionLoading(true);
@@ -494,11 +512,13 @@ export default function MechanicProcessScreen() {
         setStatus('active');
         showAlert({ type: 'success', title: 'Dilanjutkan', message: 'Proses dilanjutkan kembali.' });
       } else if (action === 'finish') {
+        const finishFormData = options.finishFormData || finishForm;
         let payload = { notes: note };
         const stepCode = STEP_CODES[currentStepIndex];
-        const stationData = buildStationData(stepCode);
-        if (stepCode === 'CREATE_WO' && finishForm.sap_reference_no.trim()) {
-          payload.sap_reference_no = finishForm.sap_reference_no.trim();
+        const stationData = buildStationData(stepCode, finishFormData);
+        const completesAfterWashing = stepCode === 'WASHING_BAY' && finishFormData.post_wash_route === 'COMPLETE_AFTER_WASH';
+        if (stepCode === 'CREATE_WO' && String(finishFormData.sap_reference_no || '').trim()) {
+          payload.sap_reference_no = String(finishFormData.sap_reference_no || '').trim();
         }
 
         if (stepCode === 'REPAIR' && partItems.length > 0) {
@@ -542,6 +562,13 @@ export default function MechanicProcessScreen() {
         resetFinishForm();
         setTimer(0);
 
+        if (completesAfterWashing) {
+          showAlert({ type: 'success', title: 'Selesai', message: 'Proses workshop selesai otomatis setelah washing bay.' });
+          await loadData();
+          setTimeout(() => router.replace('/(tabs)/mechanic?tab=history'), 1200);
+          return;
+        }
+
         // If last step, complete process
         if (STEP_CODES[currentStepIndex] === 'HANDOVER') {
           try {
@@ -557,7 +584,7 @@ export default function MechanicProcessScreen() {
         await loadData();
       }
     } catch (e) {
-      const msg = e?.response?.data?.message || 'Aksi gagal dilakukan.';
+      const msg = resolveErrorMessage(e, 'Aksi gagal dilakukan.');
       showAlert({ type: 'error', title: 'Gagal', message: msg });
     } finally {
       setActionLoading(false);
@@ -586,9 +613,10 @@ export default function MechanicProcessScreen() {
 
   const submitFinishWithForm = async () => {
     const stepCode = STEP_CODES[currentStepIndex];
-    if (!validateFinishForm(stepCode)) return;
+    const finishFormSnapshot = { ...finishForm };
+    if (!validateFinishForm(stepCode, finishFormSnapshot)) return;
     setFinishModalVisible(false);
-    await handleAction('finish');
+    await handleAction('finish', { finishFormData: finishFormSnapshot });
   };
 
   const renderChoiceField = (label, value, options, onChange, hint = null) => (
@@ -643,6 +671,7 @@ export default function MechanicProcessScreen() {
           <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
           {renderChoiceField('Kondisi sebelum cuci', finishForm.pre_wash_condition, WASH_PRE_CONDITION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, pre_wash_condition: v })), 'Pilih tingkat kekotoran unit sebelum masuk washing bay.')}
           {renderChoiceField('Kondisi sesudah cuci', finishForm.post_wash_condition, WASH_POST_CONDITION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, post_wash_condition: v })), 'Gunakan Cuci Ulang bila hasil belum memenuhi standar.')}
+          {renderChoiceField('Rute setelah washing', finishForm.post_wash_route, POST_WASH_ROUTE_OPTIONS, (v) => setFinishForm((p) => ({ ...p, post_wash_route: v })), 'Pilih lanjut perbaikan atau selesaikan work order langsung setelah washing bay.')}
           <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan visual / temuan cucian" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.visual_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, visual_note: v }))} />
         </>
       );
@@ -1060,7 +1089,7 @@ export default function MechanicProcessScreen() {
     <View style={styles.container}>
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }}
+      contentContainerStyle={{ paddingBottom: menuBarContentPadding }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
     >
       <Stack.Screen
@@ -1389,4 +1418,3 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
 });
-

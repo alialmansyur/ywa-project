@@ -84,6 +84,11 @@ class ApprovalDecisionService
                     ->where('approval_request_id', $request->id)
                     ->where('step_order', $nextAction['next_step_order'])
                     ->update(['started_at' => now(), 'updated_at' => now()]);
+
+                $advancedRequest = DB::table('approval_requests')->where('id', $request->id)->first();
+                if ($advancedRequest) {
+                    $this->notifyNextApprovers($advancedRequest, (int) $nextAction['next_step_order']);
+                }
             } elseif ($nextAction['type'] === 'finalize') {
                 DB::table('approval_requests')->where('id', $request->id)->update([
                     'status' => $nextAction['status'],
@@ -163,12 +168,23 @@ class ApprovalDecisionService
                 (int) $finding->reporter_id,
                 'Temuan Disetujui',
                 'Temuan ' . $finding->code . ' telah disetujui.',
-                [
-                    'route' => '/findings',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'finding',
                     'entity_id' => $finding->id,
                     'status' => 'submitted',
-                ],
+                    'approval_request_id' => (int) $request->id,
+                ], [
+                    'mobile' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/(tabs)/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                ], '/findings', '/findings'),
                 'finding_event'
             );
             return;
@@ -184,12 +200,23 @@ class ApprovalDecisionService
                 (int) $report->reporter_id,
                 'Laporan Breakdown Disetujui',
                 'Laporan ' . $report->report_no . ' telah disetujui.',
-                [
-                    'route' => '/report',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'breakdown_report',
                     'entity_id' => $report->id,
                     'status' => 'submitted',
-                ],
+                    'approval_request_id' => (int) $request->id,
+                ], [
+                    'mobile' => [
+                        'route_name' => 'report.index',
+                        'route' => '/(tabs)/report',
+                        'params' => ['report_id' => (string) $report->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'breakdown-reports.index',
+                        'route' => '/breakdown-reports',
+                        'params' => ['report_id' => (string) $report->id],
+                    ],
+                ], '/report', '/breakdown-reports'),
                 'breakdown_event'
             );
             return;
@@ -216,6 +243,34 @@ class ApprovalDecisionService
                 'notes' => 'Auto transition setelah approval request disetujui.',
                 'changed_at' => now(),
             ]);
+
+            if ($request->submitted_by) {
+                NotificationDispatcherService::dispatchToUser(
+                    (int) $request->submitted_by,
+                    'Approval Work Order Disetujui',
+                    'Work order ' . ($wo->code ?? ('WO-' . $wo->id)) . ' telah disetujui.',
+                    NotificationDispatcherService::buildRouteTargetPayload([
+                        'entity_type' => 'work_order',
+                        'entity_id' => $wo->id,
+                        'work_order_id' => $wo->id,
+                        'work_order_code' => $wo->code,
+                        'status' => 'pending',
+                        'approval_request_id' => (int) $request->id,
+                    ], [
+                        'mobile' => [
+                            'route_name' => 'workshop.detail',
+                            'route' => '/(tabs)/workshop/detail',
+                            'params' => ['work_order_id' => (string) $wo->id],
+                        ],
+                        'admin' => [
+                            'route_name' => 'work-orders.index',
+                            'route' => '/work-orders',
+                            'params' => ['work_order_id' => (string) $wo->id],
+                        ],
+                    ], '/workshop/detail?work_order_id=' . $wo->id, '/work-orders'),
+                    'work_order_event'
+                );
+            }
             return;
         }
 
@@ -251,12 +306,23 @@ class ApprovalDecisionService
                 (int) $report->reporter_id,
                 'Laporan Breakdown Ditolak',
                 'Laporan ' . $report->report_no . ' ditolak.',
-                [
-                    'route' => '/report',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'breakdown_report',
                     'entity_id' => $report->id,
                     'status' => 'cancelled',
-                ],
+                    'approval_request_id' => (int) $request->id,
+                ], [
+                    'mobile' => [
+                        'route_name' => 'report.index',
+                        'route' => '/(tabs)/report',
+                        'params' => ['report_id' => (string) $report->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'breakdown-reports.index',
+                        'route' => '/breakdown-reports',
+                        'params' => ['report_id' => (string) $report->id],
+                    ],
+                ], '/report', '/breakdown-reports'),
                 'breakdown_event'
             );
             return;
@@ -272,19 +338,63 @@ class ApprovalDecisionService
                 (int) $finding->reporter_id,
                 'Temuan Ditolak',
                 'Temuan ' . $finding->code . ' ditolak.',
-                [
-                    'route' => '/findings',
+                NotificationDispatcherService::buildRouteTargetPayload([
                     'entity_type' => 'finding',
                     'entity_id' => $finding->id,
                     'status' => 'in_review',
-                ],
+                    'approval_request_id' => (int) $request->id,
+                ], [
+                    'mobile' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/(tabs)/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'findings.index',
+                        'route' => '/findings',
+                        'params' => ['finding_id' => (string) $finding->id],
+                    ],
+                ], '/findings', '/findings'),
                 'finding_event'
             );
             return;
         }
 
         if ($request->reference_type === WorkOrder::class) {
-            WorkOrder::where('id', $request->reference_id)->update(['status' => 'cancelled']);
+            $wo = WorkOrder::find($request->reference_id);
+            if (! $wo) {
+                return;
+            }
+
+            $wo->update(['status' => 'cancelled']);
+
+            if ($request->submitted_by) {
+                NotificationDispatcherService::dispatchToUser(
+                    (int) $request->submitted_by,
+                    'Approval Work Order Ditolak',
+                    'Work order ' . ($wo->code ?? ('WO-' . $wo->id)) . ' ditolak.',
+                    NotificationDispatcherService::buildRouteTargetPayload([
+                        'entity_type' => 'work_order',
+                        'entity_id' => $wo->id,
+                        'work_order_id' => $wo->id,
+                        'work_order_code' => $wo->code,
+                        'status' => 'cancelled',
+                        'approval_request_id' => (int) $request->id,
+                    ], [
+                        'mobile' => [
+                            'route_name' => 'workshop.detail',
+                            'route' => '/(tabs)/workshop/detail',
+                            'params' => ['work_order_id' => (string) $wo->id],
+                        ],
+                        'admin' => [
+                            'route_name' => 'work-orders.index',
+                            'route' => '/work-orders',
+                            'params' => ['work_order_id' => (string) $wo->id],
+                        ],
+                    ], '/workshop/detail?work_order_id=' . $wo->id, '/work-orders'),
+                    'work_order_event'
+                );
+            }
             return;
         }
 
@@ -292,6 +402,47 @@ class ApprovalDecisionService
             InventoryTransaction::where('id', $request->reference_id)
                 ->where('approval_status', 'pending_approval')
                 ->update(['approval_status' => 'rejected']);
+        }
+    }
+
+    private function notifyNextApprovers(object $request, int $nextStepOrder): void
+    {
+        $step = DB::table('approval_request_steps')
+            ->where('approval_request_id', $request->id)
+            ->where('step_order', $nextStepOrder)
+            ->first();
+
+        if (! $step) {
+            return;
+        }
+
+        $approverIds = json_decode((string) ($step->approver_snapshot_json ?? '[]'), true) ?: [];
+        foreach ($approverIds as $userId) {
+            NotificationDispatcherService::dispatchToUser(
+                (int) $userId,
+                'Permintaan Approval Menunggu Review',
+                'Approval step ' . ($step->step_name ?: ('Step ' . $nextStepOrder)) . ' membutuhkan review Anda.',
+                NotificationDispatcherService::buildRouteTargetPayload([
+                    'approval_request_id' => (int) $request->id,
+                    'route_key' => $request->route_key,
+                    'reference_type' => $request->reference_type,
+                    'reference_id' => $request->reference_id,
+                    'step_order' => $nextStepOrder,
+                    'step_name' => $step->step_name,
+                ], [
+                    'mobile' => [
+                        'route_name' => 'notifications.index',
+                        'route' => '/notifications',
+                        'params' => ['approval_request_id' => (string) $request->id],
+                    ],
+                    'admin' => [
+                        'route_name' => 'approvals.inbox',
+                        'route' => '/approvals/inbox',
+                        'params' => ['approval_request_id' => (string) $request->id],
+                    ],
+                ], '/notifications', '/approvals/inbox'),
+                'approval_request'
+            );
         }
     }
 }

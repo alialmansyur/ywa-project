@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
 import { Skeleton } from '../../../../components/common/Skeleton';
@@ -12,9 +13,10 @@ import { createHeaderOptions, createHeaderIconButton } from '../../../../utils/h
 import { useActiveAssetStore } from '../../../../stores/active-asset.store';
 import { useAlert } from '../../../../contexts/AlertContext';
 import { useAuthStore } from '../../../../stores/auth.store';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 
 export default function AssetsScreen() {
+  const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const { user } = useAuthStore();
   const { activeAsset, assignAsset, unassignAsset, loadCurrentAssignment } = useActiveAssetStore();
@@ -67,11 +69,17 @@ export default function AssetsScreen() {
     }
   };
 
-  const filteredAssets = assets.filter(
-    (item) =>
-      (item.code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
+  const filteredAssets = assets.filter((item) => {
+    if (!normalizedSearchQuery) return true;
+
+    return [
+      item.code,
+      item.name,
+      item.plateNo,
+    ].some((value) => String(value || '').toLowerCase().includes(normalizedSearchQuery));
+  });
 
   const renderItem = ({ item }) => {
     const isAssigned = String(item.id) === String(activeAsset?.id || '');
@@ -86,7 +94,7 @@ export default function AssetsScreen() {
           <View style={styles.titleRow}>
             <Truck size={24} color={isAssigned ? theme.colors.primary : theme.colors.textSecondary} />
             <View style={styles.titleText}>
-              <Text style={styles.codeText}>No. Aset: {item.assetNo || '-'}</Text>
+              <Text style={styles.codeText}>Code: {item.code || '-'}</Text>
               <Text style={styles.nameText}>{item.name}</Text>
               <Text style={styles.nopolText}>No. Polisi: {item.plateNo || '-'}</Text>
             </View>
@@ -147,7 +155,7 @@ export default function AssetsScreen() {
           <Card style={styles.card}><Skeleton height={140} width="100%" /></Card>
         </View>
       ) : (
-        <FlatList data={filteredAssets} keyExtractor={(item) => String(item.id)} renderItem={renderItem} contentContainerStyle={[styles.list, { paddingBottom: MENU_BAR_CONTENT_PADDING }]} />
+        <FlatList data={filteredAssets} keyExtractor={(item) => String(item.id)} renderItem={renderItem} contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]} />
       )}
     </View>
   );

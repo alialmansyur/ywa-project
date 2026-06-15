@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -14,7 +15,7 @@ import { useActiveAssetStore } from '../../../../stores/active-asset.store';
 import { useAuthStore } from '../../../../stores/auth.store';
 import { SearchFilterPanel } from '../../../../components/common/SearchFilterPanel';
 import { getCurrentMonthRange } from '../../../../utils/dateRange';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { AssetPickerField } from '../../../../components/common/AssetPickerField';
 
 const ASSET_PARTS = [
@@ -31,9 +32,12 @@ const ASSET_PARTS = [
 ];
 
 export default function FindingsScreen() {
+  const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const { activeAsset, loadCurrentAssignment } = useActiveAssetStore();
   const { user } = useAuthStore();
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
   const roleName = String(user?.role || '').toLowerCase();
   const requiresAssignedAssetRole = ['driver', 'operator'].includes(roleName);
   const [selectedAsset, setSelectedAsset] = useState(null);
@@ -50,6 +54,7 @@ export default function FindingsScreen() {
   const lastFetchAtRef = useRef(0);
   const monthRange = getCurrentMonthRange();
   const [filters, setFilters] = useState({ search: '', from: monthRange.from, to: monthRange.to });
+  const highlightedFindingId = String(params?.finding_id || '').trim();
 
   const load = useCallback(async () => {
     const now = Date.now();
@@ -57,20 +62,36 @@ export default function FindingsScreen() {
     if (now - lastFetchAtRef.current < 1200) return;
 
     const effectiveAsset = requiresAssignedAssetRole ? activeAsset : selectedAsset;
-    if (!effectiveAsset?.id) return;
+    if (!effectiveAsset?.id && requiresAssignedAssetRole && !highlightedFindingId) return;
 
     isFetchingRef.current = true;
     lastFetchAtRef.current = now;
     const loadSeq = ++loadSeqRef.current;
     try {
       const res = await findingsService.list({ 
-        assetId: effectiveAsset.id,
+        assetId: effectiveAsset?.id,
+        mine: highlightedFindingId ? false : true,
         search: filters.search,
         from: filters.from,
         to: filters.to
       });
       if (loadSeq !== loadSeqRef.current) return;
-      setRows(res?.data || []);
+      let nextRows = res?.data || [];
+
+      if (highlightedFindingId) {
+        try {
+          const highlightedRow = await findingsService.getById(highlightedFindingId);
+          if (loadSeq !== loadSeqRef.current) return;
+          nextRows = [
+            highlightedRow,
+            ...nextRows.filter((item) => String(item?.id) !== highlightedFindingId),
+          ];
+        } catch (_error) {
+          // no-op, fallback to paginated list only
+        }
+      }
+
+      setRows(nextRows);
       setHistoryError('');
     } catch (error) {
       if (loadSeq !== loadSeqRef.current) return;
@@ -79,7 +100,7 @@ export default function FindingsScreen() {
     } finally {
       isFetchingRef.current = false;
     }
-  }, [activeAsset, filters.from, filters.search, filters.to, requiresAssignedAssetRole, selectedAsset]);
+  }, [activeAsset, filters.from, filters.search, filters.to, highlightedFindingId, requiresAssignedAssetRole, selectedAsset]);
 
   useEffect(() => {
     loadCurrentAssignment().catch(() => {});
@@ -90,6 +111,12 @@ export default function FindingsScreen() {
       load();
     }
   }, [activeTab, load]);
+
+  useEffect(() => {
+    if (highlightedFindingId) {
+      setActiveTab('riwayat');
+    }
+  }, [highlightedFindingId]);
 
   useEffect(() => {
     if (activeAsset?.id) setSelectedAsset(activeAsset);
@@ -239,7 +266,7 @@ export default function FindingsScreen() {
         </Card>
       ) : null}
       {rows.map((item) => (
-        <Card style={styles.historyCard} key={item.id}>
+        <Card style={[styles.historyCard, String(item.id) === highlightedFindingId && styles.historyCardHighlighted]} key={item.id}>
           <View style={styles.historyHeader}><Text style={styles.historyId}>{item.code}</Text><Badge text={(item.status || 'submitted').toUpperCase()} variant={item.status === 'resolved' ? 'success' : 'warning'} /></View>
           <Text style={styles.historyTitle}>{item.section}</Text>
           <Text style={styles.historyDesc}>{item.description}</Text>
@@ -254,9 +281,9 @@ export default function FindingsScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Temuan Aset', headerShown: true, headerStyle: { backgroundColor: theme.colors.primary }, headerTintColor: '#fff', headerBackVisible: false, headerBackTitleVisible: false, headerElevation: 0, headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <View style={styles.tabContainer}><TouchableOpacity style={[styles.tabBtn, activeTab === 'ajukan' && styles.tabBtnActive]} onPress={() => setActiveTab('ajukan')}><Text style={[styles.tabText, activeTab === 'ajukan' && styles.tabTextActive]}>Ajukan Temuan</Text></TouchableOpacity><TouchableOpacity style={[styles.tabBtn, activeTab === 'riwayat' && styles.tabBtnActive]} onPress={() => setActiveTab('riwayat')}><Text style={[styles.tabText, activeTab === 'riwayat' && styles.tabTextActive]}>Riwayat Pengajuan</Text></TouchableOpacity></View>
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }}>{activeTab === 'ajukan' ? renderAjukan() : renderRiwayat()}</ScrollView>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: menuBarContentPadding }}>{activeTab === 'ajukan' ? renderAjukan() : renderRiwayat()}</ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, tabContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, paddingTop: theme.spacing.sm }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: '#fff' }, tabText: { ...theme.typography.body, fontWeight: '600', color: 'rgba(255,255,255,0.7)' }, tabTextActive: { color: '#fff' }, content: { flex: 1 }, heroCard: { margin: theme.spacing.md, marginBottom: 0, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center' }, heroIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: 10 }, heroTitle: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text }, heroDesc: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2 }, formCard: { margin: theme.spacing.md, padding: theme.spacing.lg }, label: { ...theme.typography.caption, fontWeight: '600', color: theme.colors.text, marginBottom: theme.spacing.xs, marginTop: theme.spacing.sm }, input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, ...theme.typography.body, backgroundColor: theme.colors.background, marginBottom: theme.spacing.md }, textArea: { minHeight: 100 }, uploadBox: { borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', borderRadius: theme.borderRadius.md, padding: theme.spacing.xl, alignItems: 'center', backgroundColor: theme.colors.primaryLight, marginBottom: theme.spacing.lg }, uploadText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.primary }, listContainer: { padding: theme.spacing.md }, historyCard: { padding: theme.spacing.md, marginBottom: theme.spacing.sm }, historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm }, historyId: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.textSecondary }, historyTitle: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text, marginBottom: 6 }, historyDesc: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: theme.spacing.md }, historyFooter: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }, historyDate: { ...theme.typography.caption, marginLeft: 6, flex: 1 }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: theme.spacing.md }, chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background }, chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }, chipText: { ...theme.typography.caption, color: theme.colors.textSecondary }, chipTextActive: { color: '#fff', fontWeight: '600' }, emptyBtn: { marginTop: 10, backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.full, paddingHorizontal: 14, paddingVertical: 8 }, emptyBtnText: { ...theme.typography.caption, color: '#fff', fontWeight: '700' } });
+const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, tabContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, paddingTop: theme.spacing.sm }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: '#fff' }, tabText: { ...theme.typography.body, fontWeight: '600', color: 'rgba(255,255,255,0.7)' }, tabTextActive: { color: '#fff' }, content: { flex: 1 }, heroCard: { margin: theme.spacing.md, marginBottom: 0, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center' }, heroIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: 10 }, heroTitle: { ...theme.typography.body, fontWeight: '700', color: theme.colors.text }, heroDesc: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2 }, formCard: { margin: theme.spacing.md, padding: theme.spacing.lg }, label: { ...theme.typography.caption, fontWeight: '600', color: theme.colors.text, marginBottom: theme.spacing.xs, marginTop: theme.spacing.sm }, input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, ...theme.typography.body, backgroundColor: theme.colors.background, marginBottom: theme.spacing.md }, textArea: { minHeight: 100 }, uploadBox: { borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', borderRadius: theme.borderRadius.md, padding: theme.spacing.xl, alignItems: 'center', backgroundColor: theme.colors.primaryLight, marginBottom: theme.spacing.lg }, uploadText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.primary }, listContainer: { padding: theme.spacing.md }, historyCard: { padding: theme.spacing.md, marginBottom: theme.spacing.sm }, historyCardHighlighted: { borderWidth: 1, borderColor: theme.colors.primary }, historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm }, historyId: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.textSecondary }, historyTitle: { ...theme.typography.body, fontWeight: '600', color: theme.colors.text, marginBottom: 6 }, historyDesc: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: theme.spacing.md }, historyFooter: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }, historyDate: { ...theme.typography.caption, marginLeft: 6, flex: 1 }, chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: theme.spacing.md }, chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background }, chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }, chipText: { ...theme.typography.caption, color: theme.colors.textSecondary }, chipTextActive: { color: '#fff', fontWeight: '600' }, emptyBtn: { marginTop: 10, backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.full, paddingHorizontal: 14, paddingVertical: 8 }, emptyBtnText: { ...theme.typography.caption, color: '#fff', fontWeight: '700' } });

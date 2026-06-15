@@ -8,6 +8,7 @@ use App\Models\MaintenanceSchedule;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatusLog;
 use App\Services\Approval\ApprovalWorkflowService;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -213,6 +214,37 @@ class ScheduleController extends Controller
             'status' => $validated['status'] ?? 'scheduled',
         ])->load('asset:id,name,code,current_hm,current_km');
         $schedule = $this->normalizeScheduleStatus($schedule);
+
+        NotificationDispatcherService::dispatchToCurrentAssetHolder(
+            (int) $schedule->asset_id,
+            'Jadwal Maintenance Baru',
+            'Jadwal ' . $schedule->name . ' untuk unit ' . ($schedule->asset?->name ?? $schedule->asset?->code ?? ('Asset #' . $schedule->asset_id)) . ' telah dibuat.',
+            NotificationDispatcherService::buildRouteTargetPayload([
+                'entity_type' => 'schedule',
+                'entity_id' => $schedule->id,
+                'asset_id' => $schedule->asset_id,
+                'schedule_name' => $schedule->name,
+                'status' => $schedule->status,
+            ], [
+                'mobile' => [
+                    'route_name' => 'schedule.index',
+                    'route' => '/(tabs)/schedule',
+                    'params' => [
+                        'schedule_id' => (string) $schedule->id,
+                        'asset_id' => (string) $schedule->asset_id,
+                    ],
+                ],
+                'admin' => [
+                    'route_name' => 'schedule.index',
+                    'route' => '/schedule',
+                    'params' => [
+                        'schedule_id' => (string) $schedule->id,
+                        'asset_id' => (string) $schedule->asset_id,
+                    ],
+                ],
+            ], '/schedule', '/schedule'),
+            'schedule_event'
+        );
 
         return response()->json([
             'message' => 'Jadwal maintenance berhasil ditambahkan.',

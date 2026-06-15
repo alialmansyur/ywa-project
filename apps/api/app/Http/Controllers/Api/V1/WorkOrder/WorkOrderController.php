@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatusLog;
 use App\Services\Approval\ApprovalWorkflowService;
+use App\Services\Notification\NotificationDispatcherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -148,10 +149,32 @@ class WorkOrderController extends Controller
             'changed_by' => $request->user()->id,
             'changed_at' => now(),
         ]);
-        
-        \App\Services\Notification\NotificationDispatcherService::dispatchToAdmins(
-            'New Workshop Registration',
-            "Driver {$request->user()->name} mendaftarkan unit {$wo->asset->name}."
+
+        $wo->load('asset:id,name,code');
+
+        NotificationDispatcherService::dispatchToNonOperators(
+            'Registrasi Workshop Baru',
+            "Operator {$request->user()->name} mendaftarkan unit " . ($wo->asset?->name ?? $wo->asset?->code ?? ('Asset #' . $wo->asset_id)) . '.',
+            NotificationDispatcherService::buildRouteTargetPayload([
+                'entity_type' => 'work_order',
+                'entity_id' => $wo->id,
+                'work_order_id' => $wo->id,
+                'work_order_code' => $wo->code,
+                'asset_id' => $wo->asset_id,
+                'status' => $wo->status,
+            ], [
+                'mobile' => [
+                    'route_name' => 'workshop.detail',
+                    'route' => '/(tabs)/workshop/detail',
+                    'params' => ['work_order_id' => (string) $wo->id],
+                ],
+                'admin' => [
+                    'route_name' => 'work-orders.index',
+                    'route' => '/work-orders',
+                    'params' => ['work_order_id' => (string) $wo->id],
+                ],
+            ], '/workshop/detail?work_order_id=' . $wo->id, '/work-orders'),
+            'work_order_event'
         );
 
         return response()->json(['message' => 'Registrasi kedatangan berhasil.', 'work_order' => $wo->load(['asset'])], 201);

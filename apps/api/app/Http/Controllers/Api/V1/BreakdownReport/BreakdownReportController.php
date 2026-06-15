@@ -92,7 +92,7 @@ class BreakdownReportController extends Controller
             return $report;
         });
 
-        NotificationDispatcherService::dispatchToAdmins(
+        NotificationDispatcherService::dispatchToNonOperators(
             'Laporan Breakdown Baru',
             'Laporan ' . $report->report_no . ' menunggu tindak lanjut.',
             NotificationDispatcherService::buildRouteTargetPayload([

@@ -9,7 +9,8 @@ import { useNotificationStore } from '../../stores/notification.store';
 import { notificationsService } from '../../services/notifications.service';
 import React, { useEffect, useRef } from 'react';
 import { Animated, View } from 'react-native';
-import { MENU_BAR_HEIGHT, MENU_BAR_PADDING_BOTTOM, MENU_BAR_PADDING_TOP } from '../../constants/menu-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getMenuBarHeight, getMenuBarPaddingBottom, MENU_BAR_PADDING_TOP } from '../../constants/menu-bar';
 
 function NotificationIcon() {
   const { unreadCount } = useNotificationStore();
@@ -44,6 +45,9 @@ function NotificationIcon() {
 export default function TabLayout() {
   const { isAuthenticated } = useAuthStore();
   const { setNotifications } = useNotificationStore();
+  const insets = useSafeAreaInsets();
+  const menuBarHeight = getMenuBarHeight(insets.bottom);
+  const menuBarPaddingBottom = getMenuBarPaddingBottom(insets.bottom);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -63,8 +67,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: {
-          height: MENU_BAR_HEIGHT,
-          paddingBottom: MENU_BAR_PADDING_BOTTOM,
+          height: menuBarHeight,
+          paddingBottom: menuBarPaddingBottom,
           paddingTop: MENU_BAR_PADDING_TOP,
           backgroundColor: theme.colors.background,
           borderTopColor: theme.colors.border,

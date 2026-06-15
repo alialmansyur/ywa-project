@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -17,7 +18,7 @@ import { useAuthStore } from '../../../../stores/auth.store';
 import { format } from 'date-fns';
 import { SearchFilterPanel } from '../../../../components/common/SearchFilterPanel';
 import { getCurrentMonthRange } from '../../../../utils/dateRange';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { AssetPickerField } from '../../../../components/common/AssetPickerField';
 
 const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
@@ -68,6 +69,7 @@ const getStepProgressFromQueueRow = (row = {}, status = '') => {
 };
 
 export default function WorkshopRegistration() {
+  const insets = useSafeAreaInsets();
   const hasLoadedRef = useRef(false);
   const isLoadingRef = useRef(false);
   const loadSeqRef = useRef(0);
@@ -86,6 +88,7 @@ export default function WorkshopRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showAlert } = useAlert();
   const effectiveAssetId = requiresAssignedAssetRole ? activeAsset?.id : selectedAsset?.id;
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   const load = useCallback(async (silent = false) => {
     if (isLoadingRef.current) return;
@@ -303,7 +306,7 @@ export default function WorkshopRegistration() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: 'Workshop', headerShown: true, headerStyle: { backgroundColor: theme.colors.primary }, headerTintColor: '#fff', headerBackVisible: false, headerBackTitleVisible: false, headerElevation: 0, headerLeft: () => <HeaderBackButton color="#fff" /> }} />
       <View style={styles.tabContainer}><TouchableOpacity style={[styles.tabBtn, activeTab === 'ajukan' && styles.tabBtnActive]} onPress={() => setActiveTab('ajukan')}><Text style={[styles.tabText, activeTab === 'ajukan' && styles.tabTextActive]}>Ajukan Registrasi</Text></TouchableOpacity><TouchableOpacity style={[styles.tabBtn, activeTab === 'riwayat' && styles.tabBtnActive]} onPress={() => setActiveTab('riwayat')}><Text style={[styles.tabText, activeTab === 'riwayat' && styles.tabTextActive]}>Riwayat Pengajuan</Text></TouchableOpacity></View>
-      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
+      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: menuBarContentPadding }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
         {activeTab === 'ajukan' ? renderAjukan() : renderRiwayat()}
       </ScrollView>
     </View>

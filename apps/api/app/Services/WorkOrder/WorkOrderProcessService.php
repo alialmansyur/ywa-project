@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\DB;
 
 class WorkOrderProcessService
 {
+    private const POST_WASH_ROUTE_CONTINUE_REPAIR = 'CONTINUE_REPAIR';
+    private const POST_WASH_ROUTE_COMPLETE_AFTER_WASH = 'COMPLETE_AFTER_WASH';
+    private const AUTO_COMPLETE_AFTER_WASH_NOTE = '[SYSTEM] Auto-complete setelah washing bay.';
+
     public function getOrCreateTemplateForWorkOrder(WorkOrder $workOrder): ?WoProcessTemplate
     {
         if ($workOrder->processTemplate) {
@@ -198,6 +202,7 @@ class WorkOrderProcessService
             ]);
 
             $nextStep = null;
+            $completedViaWashing = false;
             if (! $requiresApproval) {
                 if ($step->step_code === 'UNIT_CHECK_PART_NEED') {
                     $partStep = $instance->stepLogs()->where('step_code', 'PART_SUPPLY')->first();
@@ -218,7 +223,15 @@ class WorkOrderProcessService
                     $this->reservePartsForWorkOrder($workOrder, $actor, $partItems);
                 }
 
-                $nextStep = $this->activateNextReadyStep($instance, $step, $actor);
+                if (
+                    $step->step_code === 'WASHING_BAY'
+                    && (($stationData['post_wash_route'] ?? null) === self::POST_WASH_ROUTE_COMPLETE_AFTER_WASH)
+                ) {
+                    $completedViaWashing = true;
+                    $this->completeRemainingWorkshopStepsAfterWashing($workOrder, $instance, $step, $actor, $outTime);
+                } else {
+                    $nextStep = $this->activateNextReadyStep($instance, $step, $actor);
+                }
             }
 
             $this->addEvent($workOrder, 'STEP_OUT', $step->step_order, $nextStep?->step_order, $actor->id, [
@@ -226,6 +239,7 @@ class WorkOrderProcessService
                 'actual_minutes' => $actual,
                 'downtime_minutes' => $downtimeMinutes,
                 'station_data' => $stationData,
+                'completed_via_washing' => $completedViaWashing,
             ]);
 
             if ($step->bay_in) {
@@ -576,8 +590,10 @@ class WorkOrderProcessService
             case 'WASHING_BAY':
                 $require('pre_wash_condition', 'Kondisi sebelum cuci wajib dipilih.');
                 $require('post_wash_condition', 'Kondisi sesudah cuci wajib dipilih.');
+                $require('post_wash_route', 'Rute setelah washing bay wajib dipilih.');
                 $ensureIn('pre_wash_condition', ['RINGAN', 'SEDANG', 'BERAT'], 'Kondisi sebelum cuci tidak valid.');
                 $ensureIn('post_wash_condition', ['OK', 'REWASH'], 'Kondisi sesudah cuci tidak valid.');
+                $ensureIn('post_wash_route', [self::POST_WASH_ROUTE_CONTINUE_REPAIR, self::POST_WASH_ROUTE_COMPLETE_AFTER_WASH], 'Rute setelah washing bay tidak valid.');
                 if ($value('post_wash_condition') === 'REWASH') {
                     $require('visual_note', 'Catatan visual wajib diisi bila hasil cuci perlu diulang.');
                 }
@@ -735,6 +751,87 @@ class WorkOrderProcessService
         $templateCode = strtoupper((string) optional($instance->template)->code);
 
         return str_starts_with($templateCode, 'WO-WORKSHOP-BAY-');
+    }
+
+    private function completeRemainingWorkshopStepsAfterWashing(
+        WorkOrder $workOrder,
+        WoProcessInstance $instance,
+        WoProcessStepLog $washingStep,
+        User $actor,
+        $completedAt
+    ): void {
+        $remainingSteps = $instance->stepLogs()
+            ->where('step_order', '>', $washingStep->step_order)
+            ->orderBy('step_order')
+            ->get();
+
+        abort_if($remainingSteps->isEmpty(), 422, 'Tidak ada step lanjutan setelah washing bay untuk diselesaikan otomatis.');
+
+        $handoverStep = $remainingSteps->first(fn (WoProcessStepLog $row) => strtoupper((string) $row->step_code) === 'HANDOVER');
+        abort_if(! $handoverStep, 422, 'Step HANDOVER tidak ditemukan pada process instance aktif.');
+
+        foreach ($remainingSteps as $step) {
+            if (in_array($step->status, ['done', 'skipped'], true)) {
+                continue;
+            }
+
+            abort_if(
+                ! in_array($step->status, ['ready', 'hold', 'waiting_approval', 'in_progress', 'rejected'], true),
+                422,
+                'Ada step lanjutan dengan status yang tidak aman untuk auto-complete setelah washing bay.'
+            );
+
+            $step->update([
+                'status' => 'done',
+                'process_in_at' => $step->process_in_at ?? $completedAt,
+                'process_out_at' => $completedAt,
+                'actual_minutes' => $step->actual_minutes ?? 1,
+                'downtime_minutes' => $step->downtime_minutes ?? 0,
+                'performed_by' => $step->performed_by ?? $actor->id,
+                'approved_by' => $step->approved_by ?? $actor->id,
+                'reject_reason' => null,
+                'notes' => $this->appendSystemNote($step->notes, self::AUTO_COMPLETE_AFTER_WASH_NOTE),
+                'bay_in' => $step->bay_in ?: $this->resolveBayByStepCode($step->step_code),
+                'bay_in_at' => $step->bay_in_at ?? $completedAt,
+                'bay_out_at' => $completedAt,
+                'queue_minutes' => 0,
+            ]);
+
+            $this->addEvent($workOrder, 'STEP_AUTO_COMPLETED_AFTER_WASHING', $washingStep->step_order, $step->step_order, $actor->id, [
+                'step_code' => $step->step_code,
+                'completed_at' => $completedAt->toISOString(),
+            ]);
+        }
+
+        $instance->update([
+            'current_step_order' => $handoverStep->step_order,
+            'state' => 'running',
+        ]);
+
+        $this->addEvent($workOrder, 'ROUTE_COMPLETE_AFTER_WASHING', $washingStep->step_order, $handoverStep->step_order, $actor->id, [
+            'step_code' => $washingStep->step_code,
+            'route' => self::POST_WASH_ROUTE_COMPLETE_AFTER_WASH,
+        ]);
+
+        $this->completeProcess(
+            $workOrder,
+            $actor,
+            'Process completed via washing bay route.'
+        );
+    }
+
+    private function appendSystemNote(?string $notes, string $systemNote): string
+    {
+        $base = trim((string) $notes);
+        if ($base === '') {
+            return $systemNote;
+        }
+
+        if (str_contains($base, $systemNote)) {
+            return $base;
+        }
+
+        return $base.' '.$systemNote;
     }
 
     private function normalizeInventoryLocation(string $location): string

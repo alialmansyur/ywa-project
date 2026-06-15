@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -12,7 +13,7 @@ import { workshopService } from '../../../../services/workshop.service';
 import { SearchFilterPanel } from '../../../../components/common/SearchFilterPanel';
 import { getCurrentMonthRange } from '../../../../utils/dateRange';
 import { workOrdersService } from '../../../../services/work-orders.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { useMechanicAccessGuard } from '../../../../hooks/useMechanicAccessGuard';
 
 const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
@@ -61,6 +62,7 @@ function pickBetterProgress(baseItem, candidateItem) {
 }
 
 export default function MechanicHub() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const { isRestrictedRole } = useMechanicAccessGuard();
   const hasLoadedRef = useRef(false);
@@ -75,6 +77,7 @@ export default function MechanicHub() {
   const [historyData, setHistoryData] = useState([]);
   const monthRange = getCurrentMonthRange();
   const [historyFilter, setHistoryFilter] = useState({ search: '', from: monthRange.from, to: monthRange.to });
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   React.useEffect(() => {
     const tab = String(params?.tab || '').toLowerCase();
@@ -419,13 +422,13 @@ export default function MechanicHub() {
           <Card style={styles.queueCard}><Skeleton height={120} width="100%" /></Card>
         </View>
       ) : activeTab === 'queue' ? (
-        <FlatList data={filteredQueue} keyExtractor={keyExtractor} renderItem={renderQueueItem} contentContainerStyle={styles.list} refreshControl={refreshControl} />
+        <FlatList data={filteredQueue} keyExtractor={keyExtractor} renderItem={renderQueueItem} contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]} refreshControl={refreshControl} />
       ) : activeTab === 'approval' ? (
         <FlatList
           data={approvalData}
           keyExtractor={keyExtractor}
           renderItem={renderQueueItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]}
           refreshControl={refreshControl}
           ListEmptyComponent={<View style={styles.emptyBox}><CheckCircle2 size={40} color={theme.colors.border} /><Text style={styles.emptyText}>Belum ada registrasi menunggu approval.</Text></View>}
         />
@@ -434,7 +437,7 @@ export default function MechanicHub() {
           data={filteredHistory}
           keyExtractor={keyExtractor}
           renderItem={renderQueueItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]}
           refreshControl={refreshControl}
           ListHeaderComponent={historyListHeader}
           ListEmptyComponent={<View style={styles.emptyBox}><CheckCircle2 size={40} color={theme.colors.border} /><Text style={styles.emptyText}>Belum ada riwayat pengerjaan hari ini.</Text></View>}
@@ -444,4 +447,4 @@ export default function MechanicHub() {
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, kpiContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, padding: theme.spacing.md, paddingBottom: theme.spacing.xl }, kpiBox: { flex: 1, alignItems: 'center' }, kpiValue: { ...theme.typography.h2, color: '#fff', marginBottom: 4 }, kpiLabel: { ...theme.typography.caption, color: 'rgba(255,255,255,0.85)' }, kpiDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginVertical: theme.spacing.xs }, tabContainer: { flexDirection: 'row', backgroundColor: '#fff', marginTop: -theme.spacing.md, borderTopLeftRadius: theme.borderRadius.lg, borderTopRightRadius: theme.borderRadius.lg, elevation: 2 }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: theme.colors.primary }, tabText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.textSecondary }, tabTextActive: { color: theme.colors.primary }, list: { padding: theme.spacing.md, paddingBottom: MENU_BAR_CONTENT_PADDING }, filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, backgroundColor: theme.colors.surface }, filterChip: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, marginRight: 8 }, filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }, filterText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' }, filterTextActive: { color: '#fff' }, queueCard: { marginBottom: theme.spacing.md }, queueCardUrgent: { borderLeftWidth: 4, borderLeftColor: theme.colors.error }, qHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md }, qId: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.primary }, qTime: { ...theme.typography.caption }, qBody: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: theme.spacing.sm }, qInfo: { marginLeft: theme.spacing.md, flex: 1, minWidth: 0 }, qUnit: { ...theme.typography.body, fontWeight: 'bold', color: theme.colors.text, flexShrink: 1, flexWrap: 'wrap' }, qMeta: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2 }, qIssue: { ...theme.typography.caption, marginTop: 4, flexShrink: 1, flexWrap: 'wrap' }, progressWrap: { marginBottom: theme.spacing.sm }, progressTrack: { width: '100%', height: 8, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden' }, progressFill: { height: 8, backgroundColor: theme.colors.primary, borderRadius: 999 }, progressText: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 4 }, qFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }, slaBox: { flexDirection: 'row', alignItems: 'center' }, slaText: { ...theme.typography.caption, color: theme.colors.textSecondary, marginLeft: 4, fontWeight: 'bold' }, actionGroup: { flexDirection: 'row', alignItems: 'center' }, bookBtn: { padding: 8, backgroundColor: theme.colors.primaryLight, borderRadius: theme.borderRadius.full, marginRight: 8 }, actionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full }, actionText: { ...theme.typography.body, color: '#fff', fontWeight: '600', marginLeft: 6, fontSize: 14 }, emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }, emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: theme.spacing.md } });
+const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, kpiContainer: { flexDirection: 'row', backgroundColor: theme.colors.primary, padding: theme.spacing.md, paddingBottom: theme.spacing.xl }, kpiBox: { flex: 1, alignItems: 'center' }, kpiValue: { ...theme.typography.h2, color: '#fff', marginBottom: 4 }, kpiLabel: { ...theme.typography.caption, color: 'rgba(255,255,255,0.85)' }, kpiDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginVertical: theme.spacing.xs }, tabContainer: { flexDirection: 'row', backgroundColor: '#fff', marginTop: -theme.spacing.md, borderTopLeftRadius: theme.borderRadius.lg, borderTopRightRadius: theme.borderRadius.lg, elevation: 2 }, tabBtn: { flex: 1, paddingVertical: theme.spacing.md, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' }, tabBtnActive: { borderBottomColor: theme.colors.primary }, tabText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.textSecondary }, tabTextActive: { color: theme.colors.primary }, list: { padding: theme.spacing.md }, filterContainer: { flexDirection: 'row', paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, backgroundColor: theme.colors.surface }, filterChip: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border, marginRight: 8 }, filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }, filterText: { ...theme.typography.caption, color: theme.colors.textSecondary, fontWeight: '600' }, filterTextActive: { color: '#fff' }, queueCard: { marginBottom: theme.spacing.md }, queueCardUrgent: { borderLeftWidth: 4, borderLeftColor: theme.colors.error }, qHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md }, qId: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.primary }, qTime: { ...theme.typography.caption }, qBody: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: theme.spacing.sm }, qInfo: { marginLeft: theme.spacing.md, flex: 1, minWidth: 0 }, qUnit: { ...theme.typography.body, fontWeight: 'bold', color: theme.colors.text, flexShrink: 1, flexWrap: 'wrap' }, qMeta: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 2 }, qIssue: { ...theme.typography.caption, marginTop: 4, flexShrink: 1, flexWrap: 'wrap' }, progressWrap: { marginBottom: theme.spacing.sm }, progressTrack: { width: '100%', height: 8, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden' }, progressFill: { height: 8, backgroundColor: theme.colors.primary, borderRadius: 999 }, progressText: { ...theme.typography.caption, color: theme.colors.textSecondary, marginTop: 4 }, qFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }, slaBox: { flexDirection: 'row', alignItems: 'center' }, slaText: { ...theme.typography.caption, color: theme.colors.textSecondary, marginLeft: 4, fontWeight: 'bold' }, actionGroup: { flexDirection: 'row', alignItems: 'center' }, bookBtn: { padding: 8, backgroundColor: theme.colors.primaryLight, borderRadius: theme.borderRadius.full, marginRight: 8 }, actionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full }, actionText: { ...theme.typography.body, color: '#fff', fontWeight: '600', marginLeft: 6, fontSize: 14 }, emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }, emptyText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: theme.spacing.md } });

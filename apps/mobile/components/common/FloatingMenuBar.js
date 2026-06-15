@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { router, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, AlertTriangle, ClipboardList, History, User } from 'lucide-react-native';
 import { theme } from '../../constants/AppTheme';
-import { MENU_BAR_HEIGHT, MENU_BAR_PADDING_BOTTOM, MENU_BAR_PADDING_TOP } from '../../constants/menu-bar';
+import { getMenuBarHeight, getMenuBarPaddingBottom, MENU_BAR_PADDING_TOP } from '../../constants/menu-bar';
 
 const MENUS = [
   { key: 'home', label: 'Beranda', icon: Home, route: '/(tabs)' },
@@ -15,6 +16,9 @@ const MENUS = [
 
 export function FloatingMenuBar() {
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const menuBarHeight = getMenuBarHeight(insets.bottom);
+  const menuBarPaddingBottom = getMenuBarPaddingBottom(insets.bottom);
 
   const isActive = (key) => {
     if (key === 'home') return pathname === '/(tabs)' || pathname === '/(tabs)/index';
@@ -26,7 +30,7 @@ export function FloatingMenuBar() {
   };
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { height: menuBarHeight, paddingBottom: menuBarPaddingBottom }]}>
       {MENUS.map((item) => {
         const Icon = item.icon;
         const active = isActive(item.key);
@@ -48,14 +52,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: MENU_BAR_HEIGHT,
     backgroundColor: theme.colors.background,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: MENU_BAR_PADDING_BOTTOM,
     paddingTop: MENU_BAR_PADDING_TOP,
   },
   btn: {

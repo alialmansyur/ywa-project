@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../../../../constants/AppTheme';
 import { Card } from '../../../../components/common/Card';
@@ -8,7 +9,7 @@ import { HeaderBackButton } from '../../../../components/common/HeaderBackButton
 import { CheckCircle2, CircleDashed } from 'lucide-react-native';
 import { workshopService } from '../../../../services/workshop.service';
 import { workOrdersService } from '../../../../services/work-orders.service';
-import { MENU_BAR_CONTENT_PADDING } from '../../../../constants/menu-bar';
+import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { useMechanicAccessGuard } from '../../../../hooks/useMechanicAccessGuard';
 
 const STEP_LABELS = {
@@ -40,6 +41,7 @@ const formatDateTime = (value) => {
 };
 
 export default function MechanicCompletedDetail() {
+  const insets = useSafeAreaInsets();
   const { isRestrictedRole } = useMechanicAccessGuard();
   const { work_order_id } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
@@ -54,6 +56,7 @@ export default function MechanicCompletedDetail() {
     completedAt: '-',
   });
   const [steps, setSteps] = useState([]);
+  const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
 
   const load = useCallback(async () => {
     if (isRestrictedRole || !work_order_id) return;
@@ -131,7 +134,7 @@ export default function MechanicCompletedDetail() {
 
   return (
     <View style={styles.container}>
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: MENU_BAR_CONTENT_PADDING }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: menuBarContentPadding }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}>
       <Stack.Screen
         options={{
           title: 'Detail Pengerjaan',

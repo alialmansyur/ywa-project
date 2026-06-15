@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Swal from 'sweetalert2'
 import { apiRequest, ApiError } from '../../../services/api'
 import { ModalPortal } from '../../shared/components/ModalPortal'
@@ -23,6 +24,7 @@ function normalizeReferenceTypeLabel(value) {
 }
 
 export function ApprovalInboxPage() {
+  const location = useLocation()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -42,6 +44,13 @@ export function ApprovalInboxPage() {
   const [lastPage, setLastPage] = useState(1)
 
   const [search, setSearch] = useState('')
+  const highlightedApprovalRequestId = new URLSearchParams(location.search).get('approval_request_id') || ''
+
+  useEffect(() => {
+    if (!highlightedApprovalRequestId) return
+    setPage(1)
+    setSearch(highlightedApprovalRequestId)
+  }, [highlightedApprovalRequestId])
 
   const fetchInbox = async () => {
     setLoading(true)
@@ -208,7 +217,7 @@ export function ApprovalInboxPage() {
                 <tr><td colSpan="5" className="py-8 text-center text-slate-400">Tidak ada permintaan approval saat ini.</td></tr>
               ) : (
                 filteredRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-700/20">
+                  <tr key={req.id} className={`hover:bg-slate-700/20 ${String(req.id) === String(highlightedApprovalRequestId) ? 'bg-blue-500/10' : ''}`}>
                     <td className="py-3 px-4">
                       <div className="font-semibold text-blue-300">{req.reference_type_label || normalizeReferenceTypeLabel(req.reference_type)}</div>
                       <div className="text-xs text-slate-400">ID: {req.reference_id}</div>
