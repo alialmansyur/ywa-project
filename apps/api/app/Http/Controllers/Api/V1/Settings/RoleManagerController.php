@@ -126,8 +126,13 @@ class RoleManagerController extends Controller
                 ->unique()
                 ->map(function ($name) use ($allPermissions) {
                     $permission = $allPermissions->firstWhere('name', $name);
-                    return ['id' => $permission?->id, 'name' => $name];
+                    if (!$permission) {
+                        return null;
+                    }
+
+                    return ['id' => $permission->id, 'name' => $permission->name];
                 })
+                ->filter()
                 ->values();
 
             if ($matched->isEmpty() && !empty($menu->permission_prefix)) {
@@ -139,10 +144,12 @@ class RoleManagerController extends Controller
 
             if ($matched->isEmpty() && !empty($menu->required_permission)) {
                 $requiredPermission = $allPermissions->firstWhere('name', $menu->required_permission);
-                $matched = collect([[
-                    'id' => $requiredPermission?->id,
-                    'name' => $menu->required_permission,
-                ]]);
+                $matched = $requiredPermission
+                    ? collect([[
+                        'id' => $requiredPermission->id,
+                        'name' => $requiredPermission->name,
+                    ]])
+                    : collect();
             }
 
             $actionPermissions = [];
@@ -163,14 +170,16 @@ class RoleManagerController extends Controller
             // agar setiap menu bisa dikonfigurasi independen pada Role Manager.
             if (!empty($menu->required_permission)) {
                 $requiredPermission = $allPermissions->firstWhere('name', $menu->required_permission);
-                $actionPermissions['view'] = [
-                    'id' => $requiredPermission?->id,
-                    'name' => $menu->required_permission,
-                ];
-                if (!$matched->contains(fn ($permission) => ($permission['name'] ?? null) === $menu->required_permission)) {
+                if ($requiredPermission) {
+                    $actionPermissions['view'] = [
+                        'id' => $requiredPermission->id,
+                        'name' => $requiredPermission->name,
+                    ];
+                }
+                if ($requiredPermission && !$matched->contains(fn ($permission) => ($permission['name'] ?? null) === $menu->required_permission)) {
                     $matched->push([
-                        'id' => $requiredPermission?->id,
-                        'name' => $menu->required_permission,
+                        'id' => $requiredPermission->id,
+                        'name' => $requiredPermission->name,
                     ]);
                 }
             }

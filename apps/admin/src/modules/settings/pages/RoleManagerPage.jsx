@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import { apiRequest, ApiError } from '../../../services/api'
 
 const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
-const ACTIONS = ['view', 'create', 'update', 'assign', 'refresh', 'manage', 'edit', 'review', 'execute']
+const ACTIONS = ['view', 'create', 'update', 'delete', 'assign', 'refresh', 'manage', 'edit', 'review', 'execute']
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, i) => i)
 
 function SkeletonBox({ className = '' }) {
@@ -27,6 +27,7 @@ export function RoleManagerPage() {
   const customPermissionIds = useMemo(() => new Set(customPermissions.map((p) => String(p.id))), [customPermissions])
   const permissionIdByName = useMemo(() => new Map((allPermissions || []).map((p) => [p.name, p.id])), [allPermissions])
   const permissionById = useMemo(() => new Map((allPermissions || []).map((p) => [String(p.id), p.name])), [allPermissions])
+  const validPermissionNames = useMemo(() => new Set((allPermissions || []).map((p) => p.name).filter(Boolean)), [allPermissions])
 
   const fetchData = async () => {
     setLoading(true)
@@ -73,6 +74,7 @@ export function RoleManagerPage() {
     try {
       const payloadPermissions = (selectedRole.permissions || [])
         .map((item) => item?.name || permissionById.get(String(item?.id)))
+        .filter((name) => validPermissionNames.has(name))
         .filter(Boolean)
       await apiRequest(`/settings/roles/${selectedRole.id}`, {
         method: 'PUT',
@@ -155,7 +157,7 @@ export function RoleManagerPage() {
         await apiRequest(`/settings/users/${selectedUserId}/permissions`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ permissions: customPermissions.map((item) => item.name).filter(Boolean) }),
+          body: JSON.stringify({ permissions: customPermissions.map((item) => item.name).filter((name) => validPermissionNames.has(name)) }),
         })
       }
 

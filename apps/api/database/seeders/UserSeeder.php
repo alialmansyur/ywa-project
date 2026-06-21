@@ -26,6 +26,7 @@ class UserSeeder extends Seeder
             'view inventory', 'manage inventory',
             'view reports', 'export reports',
             'view reports p2h', 'view reports wo', 'view reports breakdown', 'view reports cost', 'view reports utilization', 'view reports mechanic',
+            'view reports wo-history', 'view reports workshop-step-control', 'view reports service-history', 'view reports downtime-analysis',
             'view monitoring',
             'view users', 'manage users',
             'manage settings', 'manage smtp', 'manage system settings',
