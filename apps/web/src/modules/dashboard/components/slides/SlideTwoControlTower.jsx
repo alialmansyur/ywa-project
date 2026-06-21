@@ -40,7 +40,7 @@ export function SlideTwoControlTower({
         </div>
       </section> */}
 
-      <section className="panel tower-filter-panel">
+      <section className="tower-filter-panel">
         <div className="overflow-x-auto hide-scrollbar">
           <div className="tower-filter-grid tower-filter-strip">
             <input value={towerQ} onChange={(e) => { setTowerQ(e.target.value) }} placeholder="Cari code, io_code, name, WO, SAP, step..." className="mini-input" />
@@ -68,7 +68,7 @@ export function SlideTwoControlTower({
         </div>
       </section>
 
-      <section className="panel tower-board-panel">
+      <section className="tower-board-panel">
         <div className="tower-board" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
           {boardColumns.map((bay) => (
             <div key={bay} className="tower-bay-card">
@@ -78,7 +78,7 @@ export function SlideTwoControlTower({
               </div>
               <div className="tower-bay-list">
                 {(laneCards[bay] || []).slice(0, 6).map((row) => (
-                  <button type="button" key={`${bay}-${row.wo_id}`} className="tower-wo-item tower-wo-button" onClick={() => setSelectedWoId(row.wo_id)}>
+                  <button type="button" key={`${bay}-${row.wo_id}`} className={`tower-wo-item tower-wo-button tower-status-${String(row.wo_status || '').toLowerCase()}`} onClick={() => setSelectedWoId(row.wo_id)}>
                     <div className="tower-wo-code">{row.asset_code || '-'}</div>
                     <div className="tower-wo-name">{row.asset_name || '-'}</div>
                     <div className="tower-wo-sub">{row.step_name || '-'} · {String(row.wo_status || '-').toUpperCase()}</div>
@@ -93,7 +93,7 @@ export function SlideTwoControlTower({
       </section>
 
       <div className="tower-main-grid">
-        <section className="panel tower-table-panel">
+        <section className="tower-table-panel">
           <h3>Antrian WO Aktif</h3>
           {isLoading ? <div className="panel-feedback panel-feedback-loading">Memuat data control tower...</div> : null}
           {error ? <div className="panel-feedback panel-feedback-error">Gagal memuat control tower. Coba refresh slide aktif.</div> : null}
@@ -132,7 +132,7 @@ export function SlideTwoControlTower({
           </div>
         </section>
 
-        <section className="panel tower-feed-panel">
+        <section className="tower-feed-panel">
           <h3>Live Feed</h3>
           <div className="tower-feed-list hide-scrollbar">
             {(towerQuery.data?.liveFeed || []).map((event) => (

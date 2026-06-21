@@ -5,11 +5,11 @@
   "filesize_bytes": null,
   "checksum_sha256": null,
   "notes": [
-    "Siapkan file APK pada folder deployment /apk tanpa rebuild image landing.",
-    "Pertahankan nama file stabil untuk distribusi paling sederhana ke user lapangan."
+    "Tempatkan APK terbaru pada folder ini agar otomatis tersedia di landing page.",
+    "Nama file stabil memudahkan update tanpa mengubah tombol download."
   ],
   "install_notes": [
     "Aktifkan izin install aplikasi dari sumber terpercaya pada perangkat Android.",
-    "Bagikan file tapg-maintenance-latest.apk untuk distribusi operasional harian."
+    "Simpan file rilis dengan nama tapg-maintenance-latest.apk untuk distribusi tercepat."
   ]
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { elapsedSeconds, fmtElapsed, statusClass, stepCompactLabel, stepNumberFromRow } from '../utils'
 
 export function SlideOneQueue({ settings, towerQ, setTowerQ, queueRows, onRowClick, isLoading, error, now }) {
@@ -42,32 +42,24 @@ export function SlideOneQueue({ settings, towerQ, setTowerQ, queueRows, onRowCli
 
   return (
     <section className="slide-panel">
-      <div className="panel-title-wrap slide1-head">
+      <div className="panel-title-wrap slide1-head" style={{ borderBottom: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="panel-title">{settings.slide1Title}</h1>
           <p className="panel-note">{settings.slide1Desc}</p>
         </div>
-        {/* <button
-          type="button"
-          className="slide1-expand-btn"
-          onClick={() => setIsExpanded((value) => !value)}
-          aria-label={isExpanded ? 'Kecilkan slide 1' : 'Perbesar slide 1'}
-          title={isExpanded ? 'Kecilkan' : 'Perbesar'}
-        >
-          {isExpanded ? '⤡' : '⤢'}
-        </button> */}
-      </div>
-      <section className={isExpanded ? 'queue-panel queue-panel-expanded' : 'queue-panel'}>
-        {isLoading ? <div className="panel-feedback panel-feedback-loading">Memuat data queue...</div> : null}
-        {error ? <div className="panel-feedback panel-feedback-error">Gagal memuat queue. Coba refresh slide aktif.</div> : null}
-        <div className="queue-toolbar">
+        <div className="queue-toolbar" style={{ marginBottom: 0, minWidth: '350px' }}>
           <input
             value={towerQ}
             onChange={(e) => { setTowerQ(e.target.value) }}
             placeholder="Cari code, io_code, name, WO, SAP, step..."
             className="mini-input queue-search-input"
+            style={{ width: '100%' }}
           />
         </div>
+      </div>
+      <section className={isExpanded ? 'queue-panel queue-panel-expanded' : 'queue-panel'}>
+        {isLoading ? <div className="panel-feedback panel-feedback-loading">Memuat data queue...</div> : null}
+        {error ? <div className="panel-feedback panel-feedback-error">Gagal memuat queue. Coba refresh slide aktif.</div> : null}
         <div className="table-wrap queue-desktop-table queue-auto-scroll" ref={tableWrapRef}>
           <table>
             <thead>
@@ -77,8 +69,8 @@ export function SlideOneQueue({ settings, towerQ, setTowerQ, queueRows, onRowCli
                 <th>Name</th>
                 <th>Step</th>
                 <th>Time In</th>
-                <th>Elapsed</th>
-                <th>SLA</th>
+                <th className="text-right">Elapsed</th>
+                <th className="text-right">SLA</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -96,8 +88,8 @@ export function SlideOneQueue({ settings, towerQ, setTowerQ, queueRows, onRowCli
                   </td>
                   <td>{stepCompactLabel(row)} (Step {stepNumberFromRow(row)}/11)<br />{row.step_name || '-'}</td>
                   <td>{row.wo_created_at ? new Date(row.wo_created_at).toLocaleTimeString('id-ID', { hour12: false }) : '-'}</td>
-                  <td className="queue-timer">{fmtElapsed(elapsedSeconds(row, now.getTime()))}</td>
-                  <td className={Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0) ? 'queue-over' : 'queue-safe'}>
+                  <td className="text-right queue-timer">{fmtElapsed(elapsedSeconds(row, now.getTime()))}</td>
+                  <td className={Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0) ? 'text-right queue-over' : 'text-right queue-safe'}>
                     {row.queue_minutes_live || 0}m / {row.est_minutes || 0}m
                     <div className="sla-progress">
                       <span className={Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0) ? 'bar over' : 'bar safe'} style={{ width: `${Math.min(100, Math.round((Number(row.queue_minutes_live || 0) / Math.max(1, Number(row.est_minutes || 0))) * 100))}%` }} />

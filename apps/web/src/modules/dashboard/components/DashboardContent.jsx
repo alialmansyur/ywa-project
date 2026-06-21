@@ -13,6 +13,8 @@ import { SettingsModal } from './SettingsModal'
 import { WoDetailModal } from './WoDetailModal'
 import { BlockingLoader } from './BlockingLoader'
 import { DashboardSkeleton } from './DashboardSkeleton'
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 import { AppTopbar } from '../../../layout/AppTopbar'
 import { AppSidebar } from '../../../layout/AppSidebar'
 
@@ -284,6 +286,64 @@ export function DashboardContent({ me }) {
   }, [queueRows])
   const overSlaCount = queueRows.filter((row) => Number(row.queue_minutes_live || 0) > Number(row.est_minutes || 0)).length
 
+  
+  const startTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      animate: true,
+      nextBtnText: 'Lanjut ›',
+      prevBtnText: '‹ Kembali',
+      doneBtnText: 'Selesai',
+      steps: [
+        {
+          element: '.topbar .datetime',
+          popover: { title: 'Status Real-Time', description: 'Memastikan data antrean dan WO selalu terbarui otomatis tanpa perlu me-refresh halaman.', side: 'bottom', align: 'end' }
+        },
+        {
+          element: '.kpi-grid',
+          popover: { title: 'Metrik Kritis', description: 'Pantau performa bengkel hari ini secara instan, dari WO aktif hingga total downtime.', side: 'bottom', align: 'start' }
+        },
+        {
+          element: '.slider-indicator',
+          popover: { title: 'Navigasi Utama', description: 'Beralih antara rincian tabel Antrean FIFO mendatar, atau memantau aliran proses tiap tahap via Control Tower.', side: 'left', align: 'start' }
+        },
+        {
+          element: '.queue-toolbar',
+          popover: { title: 'Penelusuran Cepat', description: 'Ketikkan SAP, nama unit, atau ID untuk langsung menyaring data secara instan.', side: 'bottom', align: 'end' }
+        },
+        {
+          element: '.slider-window',
+          popover: { title: 'Area Kerja', description: 'Klik baris tabel antrean atau kartu Kanban untuk melihat panel rincian penanganan spesifik. Layar juga akan berganti otomatis secara berkala.', side: 'top', align: 'start' }
+        },
+        {
+          element: '.reload-icon-btn',
+          popover: { title: 'Muat Ulang Paksa', description: 'Klik untuk memuat ulang data dari server seketika apabila Anda tidak sabar menunggu timer siklus otomatis.', side: 'right', align: 'start' }
+        },
+        {
+          element: '.settings-btn',
+          popover: { title: 'Pengaturan Dashboard', description: 'Sesuaikan durasi slide otomatis, target SLA bengkel, serta variabel papan Kanban di sini.', side: 'right', align: 'start' }
+        },
+        {
+          element: '.theme-btn',
+          popover: { title: 'Mode Gelap/Terang', description: 'Ubah tampilan layar Anda menjadi mode Terang atau Gelap (Dark Mode) yang nyaman di mata.', side: 'right', align: 'start' }
+        },
+        {
+          element: '.fullscreen-btn',
+          popover: { title: 'Layar Penuh', description: 'Membuka dashboard satu layar penuh layaknya monitor kontrol TV untuk di bengkel.', side: 'right', align: 'start' }
+        },
+        {
+          element: '.kpi-btn',
+          popover: { title: 'Tampil/Sembunyikan KPI', description: 'Sembunyikan kartu metrik untuk mendapatkan ruang tabel/Kanban yang lebih besar.', side: 'right', align: 'start' }
+        },
+        {
+          element: '.logout-btn',
+          popover: { title: 'Keluar', description: 'Keluar dari sesi Anda dengan aman.', side: 'right', align: 'end' }
+        }
+      ]
+    });
+    driverObj.drive();
+  };
+
   const runningTextItems = useMemo(() => {
     const raw = String(settings.runningText || '').trim()
     if (!raw) return []
@@ -515,7 +575,7 @@ export function DashboardContent({ me }) {
 
   return (
     <div className="dashboard-shell dashboard-with-sidebar">
-      <AppSidebar theme={theme} setTheme={setTheme} isFullscreen={isFullscreen} toggleFullscreen={toggleFullscreen} handleManualReload={handleManualReload} isReloading={towerQuery.isFetching || (isScheduleSlideEnabled && (scheduleListQuery.isFetching || scheduleUpcomingQuery.isFetching || scheduleCalendarQuery.isFetching)) || (isAnalystSlideEnabled && analystQuery.isFetching)} openSettings={() => { setSettingsDraft(settings); setSettingsTab('general'); setShowSettings(true) }} handleLogout={handleLogout} showKpi={showKpi} setShowKpi={setShowKpi} />
+      <AppSidebar onStartTour={startTour} theme={theme} setTheme={setTheme} isFullscreen={isFullscreen} toggleFullscreen={toggleFullscreen} handleManualReload={handleManualReload} isReloading={towerQuery.isFetching || (isScheduleSlideEnabled && (scheduleListQuery.isFetching || scheduleUpcomingQuery.isFetching || scheduleCalendarQuery.isFetching)) || (isAnalystSlideEnabled && analystQuery.isFetching)} openSettings={() => { setSettingsDraft(settings); setSettingsTab('general'); setShowSettings(true) }} handleLogout={handleLogout} showKpi={showKpi} setShowKpi={setShowKpi} />
       <div className={showKpi ? "dashboard-main" : "dashboard-main dashboard-main-kpi-hidden"}>
         {isInitialDashboardLoading ? <DashboardSkeleton showKpi={showKpi} /> : (
           <>
@@ -523,20 +583,20 @@ export function DashboardContent({ me }) {
             <AppTopbar settings={settings} now={now} lastUpdateAt={Math.max(Number(towerQuery.dataUpdatedAt || 0), Number(summaryQuery.dataUpdatedAt || 0), Number(woDetailQuery.dataUpdatedAt || 0))} connectionStatus={connectionStatus} latencyMs={latencyMs} />
             {showKpi && (
               <section className="kpi-grid">
-                <article className="kpi-card kpi-clickable" role="button" tabIndex={0} onClick={() => handleKpiDrilldown('active')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleKpiDrilldown('active')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Active WO</p><h3>{activeCount}</h3><small>{activeCount - kpiPrev.active >= 0 ? '+' : ''}{activeCount - kpiPrev.active}</small></div></div></article>
-                <article className="kpi-card kpi-clickable kpi-critical" role="button" tabIndex={0} onClick={() => handleKpiDrilldown('late')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleKpiDrilldown('late')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="late" /></span><div className="kpi-meta"><p>Late Steps</p><h3>{lateCount}</h3><small>{lateCount - kpiPrev.late >= 0 ? '+' : ''}{lateCount - kpiPrev.late}</small></div></div></article>
-                <article className="kpi-card kpi-clickable kpi-warning" role="button" tabIndex={0} onClick={() => handleKpiDrilldown('hold')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleKpiDrilldown('hold')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="hold" /></span><div className="kpi-meta"><p>On Hold</p><h3>{holdCount}</h3><small>{holdCount - kpiPrev.hold >= 0 ? '+' : ''}{holdCount - kpiPrev.hold}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Completed WO (Today)</p><h3>{completedCount}</h3><small>{completedCount - kpiPrev.completed >= 0 ? '+' : ''}{completedCount - kpiPrev.completed}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Schedule Due Hari Ini</p><h3>{dueTodayCount}</h3><small>{dueTodayCount}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Downtime</p><h3>{downtimeTodayMinutes} m</h3><small>{downtimeTodayMinutes - kpiPrev.downtime >= 0 ? '+' : ''}{downtimeTodayMinutes - kpiPrev.downtime}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Active WO</p><h3>{activeCount}</h3><small className={activeCount - kpiPrev.active >= 0 ? 'positive' : 'negative'}>{activeCount - kpiPrev.active >= 0 ? '+' : ''}{activeCount - kpiPrev.active}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="late" /></span><div className="kpi-meta"><p>Late Steps</p><h3>{lateCount}</h3><small className={lateCount - kpiPrev.late > 0 ? 'negative' : 'positive'}>{lateCount - kpiPrev.late >= 0 ? '+' : ''}{lateCount - kpiPrev.late}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="hold" /></span><div className="kpi-meta"><p>On Hold</p><h3>{holdCount}</h3><small className={holdCount - kpiPrev.hold > 0 ? 'negative' : 'positive'}>{holdCount - kpiPrev.hold >= 0 ? '+' : ''}{holdCount - kpiPrev.hold}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Completed WO (Today)</p><h3>{completedCount}</h3><small className={completedCount - kpiPrev.completed >= 0 ? 'positive' : 'negative'}>{completedCount - kpiPrev.completed >= 0 ? '+' : ''}{completedCount - kpiPrev.completed}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Schedule Due<br />Hari Ini</p><h3>{dueTodayCount}</h3><small>{dueTodayCount}</small></div></div></article>
+                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Downtime</p><h3>{downtimeTodayMinutes} m</h3><small className={downtimeTodayMinutes - kpiPrev.downtime > 0 ? 'negative' : 'positive'}>{downtimeTodayMinutes - kpiPrev.downtime >= 0 ? '+' : ''}{downtimeTodayMinutes - kpiPrev.downtime}</small></div></div></article>
               </section>
             )}
             <main className="content">
           <div className="content-top">
             <div className="content-meta"><p>Auto {settings.sliderDurationSec}s</p><p>FIFO {queueRows.length} WO</p><p>Feed {(towerQuery.data?.liveFeed || []).length}</p></div>
-            <div className="slider-indicator" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <button aria-label="Pindah ke slide antrean FIFO" className={activeSlide === 0 ? 'dot active' : 'dot'} onClick={() => setActiveSlide(0)} />
-              <button aria-label="Pindah ke slide control tower" className={activeSlide === 1 ? 'dot active' : 'dot'} onClick={() => setActiveSlide(1)} />
+            <div className="slider-indicator segmented-control">
+              <button aria-label="Pindah ke slide antrean FIFO" className={activeSlide === 0 ? 'seg-btn active' : 'seg-btn'} onClick={() => setActiveSlide(0)}>Antrean FIFO</button>
+              <button aria-label="Pindah ke slide control tower" className={activeSlide === 1 ? 'seg-btn active' : 'seg-btn'} onClick={() => setActiveSlide(1)}>Control Tower</button>
             </div>
           </div>
           <div className="slider-window">
