@@ -1,9 +1,20 @@
+import { useState, useEffect } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 
 export function Navbar({ appTitle, theme, onToggle, adminUrl, dashboardUrl }) {
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-[var(--line-soft)] bg-[color:var(--nav-bg)] backdrop-blur-xl">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+    <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${isScrolled ? 'border-b border-[var(--line-soft)] bg-white/80 dark:bg-black/60 backdrop-blur-md shadow-sm' : 'border-transparent bg-transparent py-2'}`}>
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10 transition-all">
         <div className="flex min-w-0 items-center gap-3">
           <img src="/logo-app.png" alt="Logo App" className="h-11 w-11 shrink-0 object-contain" />
           <div className="min-w-0">
