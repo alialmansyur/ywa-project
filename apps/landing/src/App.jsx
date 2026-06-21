@@ -7,6 +7,20 @@ import { shortcuts } from './data/shortcuts'
 
 const STORAGE_KEY = 'ywa-landing-theme'
 
+function resolveShortcutHref(item) {
+  const envValue = import.meta.env[item.envKey]
+
+  if (item.download) {
+    const basePath = envValue || item.fallbackHref
+    const normalizedBasePath = `${basePath}`.replace(/\/+$/, '')
+    return normalizedBasePath.endsWith(`/${item.download}`)
+      ? normalizedBasePath
+      : `${normalizedBasePath}/${item.download}`.replace(/([^:]\/)\/+/g, '$1')
+  }
+
+  return envValue || item.fallbackHref
+}
+
 function getInitialTheme() {
   if (typeof window === 'undefined') return 'light'
 
@@ -43,7 +57,7 @@ export function App() {
 
   const shortcutItems = shortcuts.map((item) => ({
     ...item,
-    href: import.meta.env[item.envKey] || item.fallbackHref,
+    href: resolveShortcutHref(item),
   }))
 
   return (

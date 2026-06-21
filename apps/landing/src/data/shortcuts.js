@@ -19,11 +19,12 @@ export const shortcuts = [
   },
   {
     envKey: 'VITE_APK_BASE_PATH',
-    fallbackHref: '/apk',
+    fallbackHref: 'https://expo.dev/accounts/alialmansyur/projects/tapg-mobile/builds/79db443b-029f-49c4-a927-e9984bf0f391',
     title: 'Mobile APK',
     label: 'Field Distribution',
     description: 'Distribusi APK terbaru untuk tim lapangan dan kebutuhan maintenance mobile.',
-    actionLabel: 'Lihat APK',
+    actionLabel: 'Download APK',
     icon: 'download',
+    download: 'application-ywa-maintenance.apk',
   },
 ]
