@@ -22,8 +22,8 @@ const STEP_CODES = [
   'WASHING_BAY',
   'INSPECTION_PKB',
   'CHECKING',
-  'WAITING_BAY',
   'CREATE_WO',
+  'WAITING_BAY',
   'REPAIR',
   'QC',
   'READY_BAY_CLOSE',
@@ -34,10 +34,10 @@ const STEP_NAME_MAP = {
   REGISTRATION: 'Registrasi Kedatangan',
   APPROVAL: 'Approval Kedatangan',
   WASHING_BAY: 'Cuci Unit (Washing Bay)',
-  INSPECTION_PKB: 'Inspeksi Awal & PKB',
+  INSPECTION_PKB: 'Create PKB',
   CHECKING: 'Pengecekan Unit',
-  WAITING_BAY: 'Antrian / Waiting Bay',
   CREATE_WO: 'Pembuatan WO & Jobcard',
+  WAITING_BAY: 'Antrian / Waiting Bay',
   REPAIR: 'Proses Perbaikan',
   QC: 'QC Perbaikan',
   READY_BAY_CLOSE: 'Parkir Unit Ready & Closing',
@@ -47,7 +47,7 @@ const STEP_NAME_MAP = {
 const STATION_STEP_CODES = STEP_CODES;
 
 const STARTABLE_WO_STATUSES = ['triage', 'pending', 'approved', 'in_progress'];
-const FINISH_FORM_STEPS = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
+const FINISH_FORM_STEPS = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'CREATE_WO', 'WAITING_BAY', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 const DRAFT_PREFIX = '@mechanic_process_draft:';
 const WASH_PRE_CONDITION_OPTIONS = [
   { label: 'Ringan', value: 'RINGAN' },
@@ -72,6 +72,7 @@ const WORK_PLAN_OPTIONS = [
   { label: 'Lanjut Repair', value: 'LANJUT_REPAIR' },
   { label: 'Menunggu Approval', value: 'MENUNGGU_APPROVAL' },
 ];
+const INSPECTION_CATEGORY_OPTIONS = ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem'];
 const OK_NG_OPTIONS = [
   { label: 'OK', value: 'OK' },
   { label: 'NG', value: 'NG' },
@@ -173,11 +174,12 @@ export default function MechanicProcessScreen() {
     admin_note: '',
     jobcard_confirmation: '',
     repair_action: '',
-    technical_action: '',
+    inspection_categories: [],
+    technical_action: [],
     obstacle: '',
     hold_reason: '',
     qc_result: '',
-    qc_parameter: '',
+    qc_parameter: [],
     rework_note: '',
     closing_status: '',
     work_summary: '',
@@ -282,7 +284,11 @@ export default function MechanicProcessScreen() {
         if (Array.isArray(draft?.partItems)) setPartItems(draft.partItems);
         if (draft?.proofFile?.uri) setProofFile(draft.proofFile);
         if (draft?.finishForm && typeof draft.finishForm === 'object') {
-          setFinishForm((prev) => ({ ...prev, ...draft.finishForm }));
+          const nextFinishForm = { ...draft.finishForm };
+          nextFinishForm.inspection_categories = normalizeMultiValue(draft.finishForm.inspection_categories);
+          nextFinishForm.technical_action = normalizeMultiValue(draft.finishForm.technical_action);
+          nextFinishForm.qc_parameter = normalizeMultiValue(draft.finishForm.qc_parameter);
+          setFinishForm((prev) => ({ ...prev, ...nextFinishForm }));
         }
       } catch (_e) {}
     };
@@ -354,11 +360,12 @@ export default function MechanicProcessScreen() {
       admin_note: '',
       jobcard_confirmation: '',
       repair_action: '',
-      technical_action: '',
+      inspection_categories: [],
+      technical_action: [],
       obstacle: '',
       hold_reason: '',
       qc_result: '',
-      qc_parameter: '',
+      qc_parameter: [],
       rework_note: '',
       closing_status: '',
       work_summary: '',
@@ -380,7 +387,14 @@ export default function MechanicProcessScreen() {
           visual_note: formValues.visual_note || null,
         };
       case 'INSPECTION_PKB':
-        return { step_code: stepCode, inspection_result: formValues.inspection_result, work_plan: formValues.work_plan, main_findings: formValues.main_findings || null, action_estimate: formValues.action_estimate || null };
+        return {
+          step_code: stepCode,
+          inspection_result: formValues.inspection_result,
+          work_plan: formValues.work_plan,
+          inspection_categories: normalizeMultiValue(formValues.inspection_categories),
+          main_findings: formValues.main_findings || null,
+          action_estimate: formValues.action_estimate || null,
+        };
       case 'CHECKING':
         return { step_code: stepCode, checkpoint_result: formValues.checkpoint_result, checking_summary: formValues.checking_summary || null, proceed_status: formValues.proceed_status || null };
       case 'WAITING_BAY':
@@ -388,9 +402,20 @@ export default function MechanicProcessScreen() {
       case 'CREATE_WO':
         return { step_code: stepCode, sap_reference_no: formValues.sap_reference_no, admin_note: formValues.admin_note || null, jobcard_confirmation: formValues.jobcard_confirmation || null };
       case 'REPAIR':
-        return { step_code: stepCode, repair_action: formValues.repair_action, technical_action: formValues.technical_action || null, obstacle: formValues.obstacle || null, hold_reason: formValues.hold_reason || null };
+        return {
+          step_code: stepCode,
+          repair_action: formValues.repair_action,
+          technical_actions: normalizeMultiValue(formValues.technical_action),
+          obstacle: formValues.obstacle || null,
+          hold_reason: formValues.hold_reason || null,
+        };
       case 'QC':
-        return { step_code: stepCode, qc_result: formValues.qc_result, qc_parameter: formValues.qc_parameter || null, rework_note: formValues.rework_note || null };
+        return {
+          step_code: stepCode,
+          qc_result: formValues.qc_result,
+          qc_parameters: normalizeMultiValue(formValues.qc_parameter),
+          rework_note: formValues.rework_note || null,
+        };
       case 'READY_BAY_CLOSE':
         return { step_code: stepCode, closing_status: formValues.closing_status, work_summary: formValues.work_summary || null, document_completeness: formValues.document_completeness || null };
       case 'HANDOVER':
@@ -403,11 +428,11 @@ export default function MechanicProcessScreen() {
   const validateFinishForm = (stepCode, formValues = finishForm) => {
     const requiredMap = {
       WASHING_BAY: ['pre_wash_condition', 'post_wash_condition', 'post_wash_route'],
-      INSPECTION_PKB: ['inspection_result', 'work_plan'],
+      INSPECTION_PKB: ['inspection_result', 'work_plan', 'inspection_categories'],
       CHECKING: ['checkpoint_result', 'proceed_status'],
       WAITING_BAY: ['waiting_reason', 'waiting_type'],
       CREATE_WO: ['sap_reference_no', 'jobcard_confirmation'],
-      REPAIR: ['repair_action'],
+      REPAIR: ['repair_action', 'technical_action'],
       QC: ['qc_result', 'qc_parameter'],
       READY_BAY_CLOSE: ['closing_status', 'document_completeness'],
       HANDOVER: ['handover_confirmation'],
@@ -418,6 +443,7 @@ export default function MechanicProcessScreen() {
       post_wash_route: POST_WASH_ROUTE_OPTIONS.map((x) => x.value),
       inspection_result: INSPECTION_RESULT_OPTIONS.map((x) => x.value),
       work_plan: WORK_PLAN_OPTIONS.map((x) => x.value),
+      inspection_categories: INSPECTION_CATEGORY_OPTIONS,
       checkpoint_result: OK_NG_OPTIONS.map((x) => x.value),
       proceed_status: PROCEED_STATUS_OPTIONS.map((x) => x.value),
       waiting_type: WAITING_TYPE_OPTIONS.map((x) => x.value),
@@ -425,20 +451,28 @@ export default function MechanicProcessScreen() {
       technical_action: REPAIR_TECH_ACTION_OPTIONS.map((x) => x.value),
       obstacle: REPAIR_OBSTACLE_OPTIONS.map((x) => x.value),
       qc_result: OK_NG_OPTIONS.map((x) => x.value),
+      qc_parameter: QC_PARAMETER_OPTIONS,
       closing_status: CLOSING_STATUS_OPTIONS.map((x) => x.value),
       document_completeness: DOCUMENT_COMPLETENESS_OPTIONS.map((x) => x.value),
       handover_confirmation: HANDOVER_CONFIRMATION_OPTIONS.map((x) => x.value),
     };
     const requiredFields = requiredMap[stepCode] || [];
-    const missing = requiredFields.find((key) => !String(formValues[key] || '').trim());
+    const missing = requiredFields.find((key) => {
+      const currentValue = formValues[key];
+      if (Array.isArray(currentValue)) return currentValue.length === 0;
+      return !String(currentValue || '').trim();
+    });
     if (missing) {
       showAlert({ type: 'warning', title: 'Perhatian', message: 'Field wajib pada form Finish belum lengkap.' });
       return false;
     }
     for (const [field, allowedValues] of Object.entries(enumMap)) {
-      const value = String(formValues[field] || '').trim();
-      if (!value) continue;
-      if (!allowedValues.includes(value)) {
+      const currentValue = formValues[field];
+      const values = Array.isArray(currentValue)
+        ? currentValue.map((item) => String(item || '').trim()).filter(Boolean)
+        : [String(currentValue || '').trim()].filter(Boolean);
+      if (values.length === 0) continue;
+      if (values.some((value) => !allowedValues.includes(value))) {
         showAlert({ type: 'warning', title: 'Perhatian', message: 'Ada pilihan form yang tidak valid. Silakan pilih dari opsi yang tersedia.' });
         return false;
       }
@@ -663,6 +697,30 @@ export default function MechanicProcessScreen() {
     </View>
   );
 
+  const renderMultiSelectField = (label, values, options, onChange, hint = null) => (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      <View style={styles.segmentRow}>
+        {options.map((option) => {
+          const optionValue = typeof option === 'string' ? option : option.value;
+          const optionLabel = typeof option === 'string' ? option : option.label;
+          const isActive = values.includes(optionValue);
+          return (
+            <TouchableOpacity
+              key={`${label}-${optionValue}`}
+              style={[styles.segmentBtn, isActive && styles.segmentBtnActive]}
+              onPress={() => onChange(optionValue)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>{optionLabel}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   const renderFinishFormContent = () => {
     const stepCode = STEP_CODES[currentStepIndex];
     if (stepCode === 'WASHING_BAY') {
@@ -682,6 +740,12 @@ export default function MechanicProcessScreen() {
           <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
           {renderChoiceField('Hasil inspeksi', finishForm.inspection_result, INSPECTION_RESULT_OPTIONS, (v) => setFinishForm((p) => ({ ...p, inspection_result: v })), 'Gunakan hasil inspeksi terstruktur agar mudah dianalisis.')}
           {renderChoiceField('Rencana pekerjaan', finishForm.work_plan, WORK_PLAN_OPTIONS, (v) => setFinishForm((p) => ({ ...p, work_plan: v })))}
+          {renderMultiSelectField('Kategori pekerjaan', finishForm.inspection_categories, INSPECTION_CATEGORY_OPTIONS, (v) => setFinishForm((p) => {
+            const nextValues = p.inspection_categories.includes(v)
+              ? p.inspection_categories.filter((item) => item !== v)
+              : [...p.inspection_categories, v];
+            return { ...p, inspection_categories: nextValues };
+          }), 'Pilih minimal satu kategori pekerjaan yang ditemukan saat create PKB.')}
           <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Temuan utama / ringkasan abnormality" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.main_findings} onChangeText={(v) => setFinishForm((p) => ({ ...p, main_findings: v }))} />
           <TextInput style={styles.modalInput} placeholder="Estimasi tindakan / SLA" placeholderTextColor={theme.colors.textSecondary} value={finishForm.action_estimate} onChangeText={(v) => setFinishForm((p) => ({ ...p, action_estimate: v }))} />
         </>
@@ -723,7 +787,12 @@ export default function MechanicProcessScreen() {
         <>
           <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
           <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Aksi perbaikan (wajib)" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.repair_action} onChangeText={(v) => setFinishForm((p) => ({ ...p, repair_action: v }))} />
-          {renderChoiceField('Tindakan teknis', finishForm.technical_action, REPAIR_TECH_ACTION_OPTIONS, (v) => setFinishForm((p) => ({ ...p, technical_action: v })))}
+          {renderMultiSelectField('Tindakan teknis', finishForm.technical_action, REPAIR_TECH_ACTION_OPTIONS, (v) => setFinishForm((p) => {
+            const nextValues = p.technical_action.includes(v)
+              ? p.technical_action.filter((item) => item !== v)
+              : [...p.technical_action, v];
+            return { ...p, technical_action: nextValues };
+          }))}
           {renderChoiceField('Kendala perbaikan', finishForm.obstacle, REPAIR_OBSTACLE_OPTIONS, (v) => setFinishForm((p) => ({ ...p, obstacle: v })))}
           {['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'].includes(String(finishForm.obstacle || '').toUpperCase()) ? (
             <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Detail kendala / hold reason" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.hold_reason} onChangeText={(v) => setFinishForm((p) => ({ ...p, hold_reason: v }))} />
@@ -736,8 +805,12 @@ export default function MechanicProcessScreen() {
         <>
           <Text style={styles.modalHelperText}>{STEP_HELPER_COPY[stepCode]}</Text>
           {renderChoiceField('Hasil QC', finishForm.qc_result, OK_NG_OPTIONS, (v) => setFinishForm((p) => ({ ...p, qc_result: v })), 'Pilih NG bila unit harus rework.')}
-          {renderQuickPickField('Parameter QC cepat', finishForm.qc_parameter, QC_PARAMETER_OPTIONS, (v) => setFinishForm((p) => ({ ...p, qc_parameter: v })), 'Tap salah satu area bila parameter QC sesuai.')}
-          <TextInput style={styles.modalInput} placeholder="Parameter QC / area cek" placeholderTextColor={theme.colors.textSecondary} value={finishForm.qc_parameter} onChangeText={(v) => setFinishForm((p) => ({ ...p, qc_parameter: v }))} />
+          {renderMultiSelectField('Parameter QC cepat', finishForm.qc_parameter, QC_PARAMETER_OPTIONS, (v) => setFinishForm((p) => {
+            const nextValues = p.qc_parameter.includes(v)
+              ? p.qc_parameter.filter((item) => item !== v)
+              : [...p.qc_parameter, v];
+            return { ...p, qc_parameter: nextValues };
+          }), 'Pilih minimal satu area QC yang diperiksa.')}
           {String(finishForm.qc_result || '').toUpperCase() === 'NG' ? (
             <TextInput style={[styles.modalInput, styles.modalTextArea]} placeholder="Catatan rework (wajib bila NG)" placeholderTextColor={theme.colors.textSecondary} multiline value={finishForm.rework_note} onChangeText={(v) => setFinishForm((p) => ({ ...p, rework_note: v }))} />
           ) : null}
@@ -1418,3 +1491,12 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
 });
+  const normalizeMultiValue = (value) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+      return value.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    return [];
+  };

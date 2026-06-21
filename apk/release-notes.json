@@ -1,0 +1,15 @@
+{
+  "version": "pending-release",
+  "filename": "tapg-maintenance-latest.apk",
+  "updated_at": "2026-06-20T00:00:00+08:00",
+  "filesize_bytes": null,
+  "checksum_sha256": null,
+  "notes": [
+    "Tempatkan APK terbaru pada folder ini agar otomatis tersedia di landing page.",
+    "Nama file stabil memudahkan update tanpa mengubah tombol download."
+  ],
+  "install_notes": [
+    "Aktifkan izin install aplikasi dari sumber terpercaya pada perangkat Android.",
+    "Simpan file rilis dengan nama tapg-maintenance-latest.apk untuk distribusi tercepat."
+  ]
+}

@@ -1,4 +1,4 @@
-﻿export function SettingsModal({ show, setShow, settingsTab, setSettingsTab, settingsDraft, setSettingsDraft, saveSettings, lockOpen = false }) {
+﻿export function SettingsModal({ show, setShow, settingsTab, setSettingsTab, settingsDraft, setSettingsDraft, saveSettings, saving = false, lockOpen = false }) {
   if (!show) return null
   return (
     <div className="settings-overlay" onClick={() => { if (!lockOpen) setShow(false) }}>
@@ -35,8 +35,8 @@
           ) : null}
         </div>
         <div className="settings-actions">
-          <button type="button" className="btn-md" onClick={() => setShow(false)}>Batal</button>
-          <button type="button" className="primary btn-xl" onClick={saveSettings}>Simpan</button>
+          <button type="button" className="btn-md" onClick={() => setShow(false)} disabled={saving}>Batal</button>
+          <button type="button" className="primary btn-xl" onClick={saveSettings} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
         </div>
       </div>
     </div>

@@ -82,6 +82,7 @@ export const NAV_ITEMS = [
       { id: 'master-data-manager', label: 'Master Data Manager', href: '/settings/master-data' },
       { id: 'database-backup', label: 'Database Backup', href: '/settings/database-backup' },
       { id: 'dashboard-access-token', label: 'Token Akses Dashboard', href: '/settings/dashboard-access-token' },
+      { id: 'dashboard-settings', label: 'Dashboard Settings', href: '/settings/dashboard-settings' },
     ],
   },
 ]

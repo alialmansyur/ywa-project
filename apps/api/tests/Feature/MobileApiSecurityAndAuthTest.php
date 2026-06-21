@@ -95,4 +95,43 @@ class MobileApiSecurityAndAuthTest extends TestCase
                 ->assertJsonPath('code', 'UNAUTHORIZED');
         }
     }
+
+    public function test_login_allows_multiple_active_sessions_for_same_user(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'multi-session@tapg.com',
+            'password' => Hash::make('password123'),
+            'is_active' => true,
+        ]);
+
+        $first = $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+            'client_category' => 'web',
+            'client_app' => 'admin',
+        ])->assertOk();
+
+        $second = $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+            'client_category' => 'web',
+            'client_app' => 'web',
+        ])->assertOk();
+
+        $firstToken = $first->json('access_token');
+        $secondToken = $second->json('access_token');
+
+        $this->assertNotSame($firstToken, $secondToken);
+        $this->assertSame(2, $user->fresh()->tokens()->count());
+
+        $this->withHeader('Authorization', 'Bearer '.$firstToken)
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('email', $user->email);
+
+        $this->withHeader('Authorization', 'Bearer '.$secondToken)
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('email', $user->email);
+    }
 }

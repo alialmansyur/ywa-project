@@ -123,18 +123,18 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
             {!logoError ? (
               <img
-                src="/logo-ywa.png"
-                alt="WTS Logo"
+                src="/logo-app.png"
+                alt="Logo YWA"
                 className="w-8 h-8 object-contain"
                 onError={() => setLogoError(true)}
               />
             ) : (
               <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-bold">
-                W
+                Y
               </div>
             )}
           </div>
-          {!collapsed && <div><div className="font-bold text-sm">WTS</div><div className="text-xs text-slate-400">Workshop Tracking System</div></div>}
+          {!collapsed && <div><div className="font-bold text-sm">YWA</div><div className="text-xs text-slate-400">YWA Maintenance</div></div>}
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
                 onClick={() => {
                   if (isMobile && typeof onCloseMobile === 'function') onCloseMobile()
                 }}
-                className={({ isActive }) => `text-sm font-medium transition-all duration-200 ${collapsed ? 'w-10 h-10 aspect-square mx-auto flex items-center justify-center rounded-xl' : 'flex items-center gap-3 px-3 py-2.5 rounded-xl'} ${isActive ? 'bg-blue-500/20 text-blue-400 shadow-sm' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}`}
+                className={({ isActive }) => `text-sm font-semibold transition-all duration-200 ${collapsed ? 'w-10 h-10 aspect-square mx-auto flex items-center justify-center rounded-xl' : 'flex items-center gap-3 px-3 py-2.5 rounded-xl'} ${isActive ? 'bg-blue-500/20 text-blue-400 shadow-sm' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}`}
               >
                 {({ isActive }) => (
                   <>
@@ -179,7 +179,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
                   }
                   setOpenGroups((prev) => ({ ...prev, [item.id]: !groupOpen }))
                 }}
-                className={`w-full text-sm font-medium transition-all duration-200 ${collapsed ? 'w-10 h-10 aspect-square mx-auto flex items-center justify-center rounded-xl' : 'flex items-center gap-3 px-3 py-2.5 rounded-xl'} ${childActive ? 'bg-blue-500/20 text-blue-400 shadow-sm' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}`}
+                className={`w-full text-sm font-semibold transition-all duration-200 ${collapsed ? 'w-10 h-10 aspect-square mx-auto flex items-center justify-center rounded-xl' : 'flex items-center gap-3 px-3 py-2.5 rounded-xl'} ${childActive ? 'bg-blue-500/20 text-blue-400 shadow-sm' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'}`}
               >
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d={item.icon} />
@@ -197,7 +197,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
                       onClick={() => {
                         if (isMobile && typeof onCloseMobile === 'function') onCloseMobile()
                       }}
-                      className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${isActive ? 'bg-blue-500/15 text-blue-300' : 'text-slate-400 hover:bg-slate-700/40 hover:text-slate-200'}`}
+                      className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${isActive ? 'bg-blue-500/15 text-blue-300' : 'text-slate-400 hover:bg-slate-700/40 hover:text-slate-200'}`}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
                       <span>{child.label}</span>
@@ -216,7 +216,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">{currentUser.name}</div>
+                <div className="text-sm font-semibold text-white truncate">{currentUser.name}</div>
                 <div className="text-xs text-slate-400">{currentUser.role}</div>
               </div>
               <button type="button" onClick={handleLogout} className="text-slate-500 hover:text-red-400 transition-colors" title="Logout">

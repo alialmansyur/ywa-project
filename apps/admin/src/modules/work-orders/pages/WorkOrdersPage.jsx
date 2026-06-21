@@ -203,6 +203,9 @@ export function WorkOrdersPage() {
   }
 
   const timelineLabel = (item) => {
+    const enrichedLabel = String(item?.event_label || '').trim()
+    if (enrichedLabel) return enrichedLabel
+
     const raw = String(item?.title || '')
     if (!raw) return '-'
     if (item?.type === 'status') return raw
@@ -223,6 +226,12 @@ export function WorkOrdersPage() {
   }
 
   const timelineTone = (item) => {
+    const explicitState = String(item?.state || '').toLowerCase()
+    if (explicitState === 'completed') return { line: 'border-green-500/40', text: 'text-green-300' }
+    if (explicitState === 'in_progress') return { line: 'border-yellow-500/40', text: 'text-yellow-300' }
+    if (explicitState === 'hold') return { line: 'border-orange-500/40', text: 'text-orange-300' }
+    if (explicitState === 'rejected') return { line: 'border-red-500/40', text: 'text-red-300' }
+
     const key = String(item?.title || '')
     if (['PROCESS_COMPLETED', 'STEP_OUT', 'STEP_APPROVED'].includes(key)) {
       return { line: 'border-green-500/40', text: 'text-green-300' }
@@ -234,6 +243,9 @@ export function WorkOrdersPage() {
   }
 
   const timelineState = (item) => {
+    const explicitState = String(item?.state || '').toLowerCase()
+    if (explicitState) return explicitState
+
     const key = String(item?.title || '')
     if (['PROCESS_COMPLETED', 'STEP_OUT', 'STEP_APPROVED'].includes(key)) return 'done'
     if (['PROCESS_STARTED', 'STEP_IN', 'STEP_RESUME'].includes(key)) return 'in_progress'

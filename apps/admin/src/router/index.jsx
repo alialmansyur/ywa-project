@@ -29,6 +29,7 @@ import { NotificationTestPage } from '../modules/settings/pages/NotificationTest
 import { MasterDataManagerPage } from '../modules/settings/pages/MasterDataManagerPage'
 import { DatabaseBackupPage } from '../modules/settings/pages/DatabaseBackupPage'
 import { DashboardAccessTokenPage } from '../modules/settings/pages/DashboardAccessTokenPage'
+import { DashboardSettingsPage } from '../modules/settings/pages/DashboardSettingsPage'
 import { ApprovalInboxPage } from '../modules/approvals/pages/ApprovalInboxPage'
 import { ApprovalHistoryPage } from '../modules/approvals/pages/ApprovalHistoryPage'
 import { ApprovalMatrixPage } from '../modules/settings/pages/ApprovalMatrixPage'
@@ -158,6 +159,7 @@ export function AppRouter() {
       
       <Route path="/settings/database-backup" element={<ProtectedByMenu authenticated={authenticated} routePath="/settings/database-backup">{withLayout('Database Backup', <DatabaseBackupPage />)}</ProtectedByMenu>} />
       <Route path="/settings/dashboard-access-token" element={<ProtectedByMenu authenticated={authenticated} routePath="/settings/dashboard-access-token">{withLayout('Token Akses Dashboard', <DashboardAccessTokenPage />)}</ProtectedByMenu>} />
+      <Route path="/settings/dashboard-settings" element={<ProtectedByMenu authenticated={authenticated} routePath="/settings/dashboard-settings">{withLayout('Dashboard Settings', <DashboardSettingsPage />)}</ProtectedByMenu>} />
 
       {/* New Modules */}
       <Route path="/approvals/inbox" element={<ProtectedByMenu authenticated={authenticated} routePath="/approvals/inbox">{withLayout('Approval Inbox', <ApprovalInboxPage />)}</ProtectedByMenu>} />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Swal from 'sweetalert2'
-import { TOKEN_KEY, getJson, revokeSession } from '../../../services/api'
+import { TOKEN_KEY, getJson, putJson, revokeSession } from '../../../services/api'
 import { DEFAULT_SETTINGS } from './constants'
 import { buildWorkshopSearchText, elapsedSeconds, isActiveWorkshopRow, resolveBoardColumn } from './utils'
 import { KpiIcon } from './icons'
@@ -26,13 +26,10 @@ export function DashboardContent({ me }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('tapg-theme') || 'dark')
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement))
   const [showSettings, setShowSettings] = useState(false)
-  const [settings, setSettings] = useState(() => {
-    const raw = localStorage.getItem('tapg-dashboard-settings')
-    if (!raw) return DEFAULT_SETTINGS
-    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } } catch { return DEFAULT_SETTINGS }
-  })
-  const [settingsDraft, setSettingsDraft] = useState(settings)
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [settingsDraft, setSettingsDraft] = useState(DEFAULT_SETTINGS)
   const [settingsTab, setSettingsTab] = useState('general')
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [scheduleDate, setScheduleDate] = useState(new Date())
   const [scheduleQ, setScheduleQ] = useState('')
   const [scheduleStatus, setScheduleStatus] = useState('')
@@ -70,10 +67,6 @@ export function DashboardContent({ me }) {
   }, [theme])
 
   useEffect(() => {
-    localStorage.setItem('tapg-dashboard-settings', JSON.stringify(settings))
-  }, [settings])
-
-  useEffect(() => {
     const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
     document.addEventListener('fullscreenchange', onChange)
     return () => document.removeEventListener('fullscreenchange', onChange)
@@ -106,6 +99,31 @@ export function DashboardContent({ me }) {
     if (towerStatus !== 'all') params.set('status', towerStatus)
     return params.toString()
   }, [towerQ, towerBay, towerType, towerStatus])
+
+  const settingsQuery = useQuery({
+    queryKey: ['dashboard-settings'],
+    queryFn: async () => {
+      const response = await getJson('/settings/dashboard-settings')
+      return response?.data || DEFAULT_SETTINGS
+    },
+    refetchInterval: 15000,
+  })
+
+  useEffect(() => {
+    if (!settingsQuery.data) return
+    const next = {
+      ...DEFAULT_SETTINGS,
+      ...settingsQuery.data,
+      sliderDurationSec: Number(settingsQuery.data?.sliderDurationSec) || DEFAULT_SETTINGS.sliderDurationSec,
+      slide1ScrollSpeed: Number(settingsQuery.data?.slide1ScrollSpeed) || DEFAULT_SETTINGS.slide1ScrollSpeed,
+      slide1ScrollDelaySec: Number(settingsQuery.data?.slide1ScrollDelaySec) || DEFAULT_SETTINGS.slide1ScrollDelaySec,
+      slide1ScrollLoopPauseMs: Number(settingsQuery.data?.slide1ScrollLoopPauseMs) || DEFAULT_SETTINGS.slide1ScrollLoopPauseMs,
+    }
+    setSettings(next)
+    if (!showSettings && !isSavingSettings) {
+      setSettingsDraft(next)
+    }
+  }, [isSavingSettings, settingsQuery.data, showSettings])
 
   const towerQuery = useQuery({
     queryKey: ['tower-dashboard', towerParams],
@@ -369,6 +387,7 @@ export function DashboardContent({ me }) {
     setIsManualReloading(true)
     try {
       const tasks = [
+        settingsQuery.refetch(),
         towerQuery.refetch(),
         summaryQuery.refetch(),
         selectedWoId ? woDetailQuery.refetch() : Promise.resolve(),
@@ -442,6 +461,43 @@ export function DashboardContent({ me }) {
     else if (kind === 'late') setTowerStatus('approved')
     else if (kind === 'active') setTowerStatus('all')
     setActiveSlide(1)
+  }
+
+  const saveSettings = async () => {
+    const payload = {
+      ...settingsDraft,
+      sliderDurationSec: Number(settingsDraft.sliderDurationSec) || DEFAULT_SETTINGS.sliderDurationSec,
+      slide1ScrollSpeed: Number(settingsDraft.slide1ScrollSpeed) || DEFAULT_SETTINGS.slide1ScrollSpeed,
+      slide1ScrollDelaySec: Number(settingsDraft.slide1ScrollDelaySec) || DEFAULT_SETTINGS.slide1ScrollDelaySec,
+      slide1ScrollLoopPauseMs: Number(settingsDraft.slide1ScrollLoopPauseMs) || DEFAULT_SETTINGS.slide1ScrollLoopPauseMs,
+    }
+
+    setIsSavingSettings(true)
+    try {
+      const response = await putJson('/settings/dashboard-settings', payload)
+      const next = { ...DEFAULT_SETTINGS, ...(response?.data || payload) }
+      setSettings(next)
+      setSettingsDraft(next)
+      setShowSettings(false)
+      await settingsQuery.refetch()
+      await Swal.fire({
+        title: 'Berhasil',
+        text: 'Dashboard settings berhasil disimpan.',
+        icon: 'success',
+        timer: 1800,
+        showConfirmButton: false,
+        customClass: { popup: 'swal-rounded' },
+      })
+    } catch (error) {
+      await Swal.fire({
+        title: 'Gagal Menyimpan',
+        text: error?.message || 'Dashboard settings gagal disimpan.',
+        icon: 'error',
+        customClass: { popup: 'swal-rounded' },
+      })
+    } finally {
+      setIsSavingSettings(false)
+    }
   }
 
   const isInitialDashboardLoading = useMemo(() => {
@@ -520,7 +576,7 @@ export function DashboardContent({ me }) {
           </>
         )}
       </div>
-      <SettingsModal show={showSettings} setShow={setShowSettings} settingsTab={settingsTab} setSettingsTab={setSettingsTab} settingsDraft={settingsDraft} setSettingsDraft={setSettingsDraft} saveSettings={() => { setSettings({ ...settingsDraft, sliderDurationSec: Number(settingsDraft.sliderDurationSec) || DEFAULT_SETTINGS.sliderDurationSec, slide1ScrollSpeed: Number(settingsDraft.slide1ScrollSpeed) || DEFAULT_SETTINGS.slide1ScrollSpeed, slide1ScrollDelaySec: Number(settingsDraft.slide1ScrollDelaySec) || DEFAULT_SETTINGS.slide1ScrollDelaySec, slide1ScrollLoopPauseMs: Number(settingsDraft.slide1ScrollLoopPauseMs) || DEFAULT_SETTINGS.slide1ScrollLoopPauseMs }); setShowSettings(false) }} lockOpen={showSettings} />
+      <SettingsModal show={showSettings} setShow={setShowSettings} settingsTab={settingsTab} setSettingsTab={setSettingsTab} settingsDraft={settingsDraft} setSettingsDraft={setSettingsDraft} saveSettings={saveSettings} saving={isSavingSettings} lockOpen={showSettings} />
       <WoDetailModal selectedWoId={selectedWoId} setSelectedWoId={setSelectedWoId} woDetailQuery={woDetailQuery} />
       {isManualReloading ? <BlockingLoader text="Memuat data terbaru..." /> : null}
     </div>

@@ -1,15 +1,15 @@
 ﻿export const BAY_ORDER = ['registration', 'approval', 'washing_bay', 'inspection_pkb', 'checking', 'waiting_bay', 'create_wo', 'repair', 'qc', 'ready_bay_close', 'handover']
 
-export const CONTROL_TOWER_BOARD_ORDER = ['approval', 'washing_bay', 'inspection_pkb', 'checking', 'waiting_bay', 'create_wo', 'repair', 'qc', 'ready_bay_close', 'handover']
+export const CONTROL_TOWER_BOARD_ORDER = ['approval', 'washing_bay', 'inspection_pkb', 'checking', 'create_wo', 'waiting_bay', 'repair', 'qc', 'ready_bay_close', 'handover']
 
 export const BAY_LABEL = {
   registration: 'Registrasi',
   approval: 'Approval',
   washing_bay: 'Washing Bay',
-  inspection_pkb: 'Inspection & PKB',
+  inspection_pkb: 'Create PKB',
   checking: 'Checking',
-  waiting_bay: 'Waiting Bay',
   create_wo: 'Create WO',
+  waiting_bay: 'Waiting Bay',
   repair: 'Repair',
   qc: 'QC',
   ready_bay_close: 'Ready Bay & Close',
@@ -54,7 +54,7 @@ export const EVENT_LABELS = {
 }
 
 export const DEFAULT_SETTINGS = {
-  headerTitle: 'TAPG Workshop Operations Dashboard',
+  headerTitle: 'YWA Workshop Operations Dashboard',
   headerSubtitle: 'Monitoring antrean, flow proses, dan preventive secara realtime.',
   sliderDurationSec: 20,
   slide1ScrollSpeed: 24,

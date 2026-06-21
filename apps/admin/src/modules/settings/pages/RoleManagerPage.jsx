@@ -3,7 +3,7 @@ import Swal from 'sweetalert2'
 import { apiRequest, ApiError } from '../../../services/api'
 
 const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
-const ACTIONS = ['view', 'create', 'update', 'delete', 'assign', 'refresh', 'manage', 'edit', 'review', 'execute']
+const ACTIONS = ['view', 'create', 'update', 'assign', 'refresh', 'manage', 'edit', 'review', 'execute']
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, i) => i)
 
 function SkeletonBox({ className = '' }) {

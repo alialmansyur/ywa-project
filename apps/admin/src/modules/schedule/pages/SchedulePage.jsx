@@ -296,20 +296,6 @@ export function SchedulePage() {
     }
   }
 
-  const handleCreateWo = async (row) => {
-    try {
-      await apiRequest(`/schedules/${row.id}/create-work-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supervisor_id: me?.id || null, priority: 'medium' }),
-      })
-      await loadSchedules()
-      await swal.fire({ icon: 'success', title: 'Berhasil', text: 'WO berhasil dibuat dari jadwal.' })
-    } catch (err) {
-      await swal.fire({ icon: 'error', title: 'Gagal', text: err instanceof ApiError ? err.message : 'Gagal membuat WO.' })
-    }
-  }
-
   const handleExportXlsx = async () => {
     try {
       const allRows = []
@@ -485,7 +471,6 @@ export function SchedulePage() {
                     <div className="text-xs text-slate-300">{s.asset?.name || '-'}</div>
                     <div className="text-xs text-red-300">Due: {formatDateId(s.next_due_at)}</div>
                   </div>
-                  <button onClick={() => handleCreateWo(s)} className="btn-primary px-3 py-1.5 rounded-lg text-xs text-white">Buat WO</button>
                 </div>
               ))}
             </div>
@@ -507,7 +492,6 @@ export function SchedulePage() {
                       <div className="text-xs text-slate-400">{s.type} · Due: {formatDateId(s.next_due_at)} · {s.status}</div>
                     </div>
                     <button onClick={() => openEditModal(s)} className="text-xs px-2 py-1 rounded-lg border border-slate-600 text-slate-200">Edit</button>
-                    <button onClick={() => handleCreateWo(s)} className="text-xs px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400">WO</button>
                     <button onClick={() => handleDelete(s.id)} className="text-xs px-2 py-1 rounded-lg border border-red-500/30 text-red-300">Hapus</button>
                   </div>
                 )

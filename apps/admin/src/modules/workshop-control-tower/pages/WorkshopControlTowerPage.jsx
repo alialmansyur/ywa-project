@@ -9,10 +9,10 @@ function SkeletonBox({ className = '' }) {
 const bayLabels = {
   approval: 'Approval',
   washing_bay: 'Washing Bay',
-  inspection_pkb: 'Inspection & PKB',
+  inspection_pkb: 'Create PKB',
   checking: 'Checking',
-  waiting_bay: 'Waiting Bay',
   create_wo: 'Create WO',
+  waiting_bay: 'Waiting Bay',
   repair: 'Repair',
   qc: 'QC',
   ready_bay_close: 'Ready Bay & Close',
@@ -186,7 +186,7 @@ export function WorkshopControlTowerPage() {
 
   const boardOrder = useMemo(() => [
     'approval', 'washing_bay', 'inspection_pkb',
-    'checking', 'waiting_bay', 'create_wo', 'repair', 'qc',
+    'checking', 'create_wo', 'waiting_bay', 'repair', 'qc',
     'ready_bay_close', 'handover',
   ], [])
   const statusOptions = useMemo(() => ['registered', 'triage', 'draft', 'pending', 'approved', 'in_progress', 'on_hold', 'completed', 'cancelled'], [])

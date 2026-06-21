@@ -25,14 +25,15 @@ use Illuminate\Validation\ValidationException;
  */
 class AuthController extends Controller
 {
-    private function issueAccessToken(User $user, string $clientCategory): array
+    private function issueAccessToken(User $user, string $clientCategory, string $clientApp = 'web'): array
     {
-        $tokenName = 'api-token:'.$clientCategory;
-
-        // Batasi login ganda hanya dalam kategori yang sama (web-mobile tetap boleh bersamaan).
-        $user->tokens()
-            ->where('name', $tokenName)
-            ->delete();
+        $tokenName = sprintf(
+            'api-token:%s:%s:%s:%s',
+            $clientCategory,
+            $clientApp,
+            now()->format('YmdHis'),
+            Str::uuid()->toString()
+        );
 
         $tokenLifetimeMinutes = (int) config('sanctum.expiration', 1440);
         if ($tokenLifetimeMinutes <= 0) {
@@ -51,6 +52,18 @@ class AuthController extends Controller
     {
         $category = strtolower((string) ($request->input('client_category') ?: $request->header('X-Client-Category', '')));
         return in_array($category, ['web', 'mobile'], true) ? $category : 'web';
+    }
+
+    private function resolveClientApp(Request $request, string $clientCategory): string
+    {
+        $app = strtolower((string) ($request->input('client_app') ?: $request->header('X-Client-App', '')));
+        $allowed = ['admin', 'web', 'mobile'];
+
+        if (in_array($app, $allowed, true)) {
+            return $app;
+        }
+
+        return $clientCategory === 'mobile' ? 'mobile' : 'web';
     }
 
     private function resolveDutyLocation(User $user): ?string
@@ -159,6 +172,7 @@ class AuthController extends Controller
             'email'    => 'nullable|string|max:255',
             'password' => 'required|string',
             'client_category' => 'nullable|string|in:web,mobile',
+            'client_app' => 'nullable|string|in:admin,web,mobile',
         ]);
 
         $loginValue = trim((string) ($validated['login'] ?? $validated['email'] ?? ''));
@@ -199,7 +213,8 @@ class AuthController extends Controller
         }
 
         $clientCategory = $this->resolveClientCategory($request);
-        $issued = $this->issueAccessToken($user, $clientCategory);
+        $clientApp = $this->resolveClientApp($request, $clientCategory);
+        $issued = $this->issueAccessToken($user, $clientCategory, $clientApp);
         $token = $issued['token'];
         $tokenExpiresAt = $issued['expires_at'];
 
@@ -210,6 +225,7 @@ class AuthController extends Controller
             'access_token' => $token,
             'token'        => $token, // backward compatibility
             'session_category' => $clientCategory,
+            'session_client_app' => $clientApp,
             'expires_at' => $tokenExpiresAt->toISOString(),
             'expires_in_seconds' => $tokenExpiresAt->diffInSeconds(now()),
             'user'         => $this->buildUserPayload($user),
@@ -277,7 +293,8 @@ class AuthController extends Controller
             ]);
 
         $clientCategory = 'web';
-        $issued = $this->issueAccessToken($user, $clientCategory);
+        $clientApp = 'web';
+        $issued = $this->issueAccessToken($user, $clientCategory, $clientApp);
         $token = $issued['token'];
         $tokenExpiresAt = $issued['expires_at'];
 
@@ -288,6 +305,7 @@ class AuthController extends Controller
             'access_token' => $token,
             'token' => $token,
             'session_category' => $clientCategory,
+            'session_client_app' => $clientApp,
             'expires_at' => $tokenExpiresAt->toISOString(),
             'expires_in_seconds' => $tokenExpiresAt->diffInSeconds(now()),
             'user' => $this->buildUserPayload($user),

@@ -16,10 +16,10 @@ const STEP_LABELS = {
   10: 'Registrasi Kedatangan',
   20: 'Approval Kedatangan',
   30: 'Cuci Unit (Washing Bay)',
-  40: 'Inspeksi Awal & PKB',
+  40: 'Create PKB',
   50: 'Pengecekan Unit',
-  60: 'Antrian / Waiting Bay',
-  70: 'Pembuatan WO & Jobcard',
+  60: 'Pembuatan WO & Jobcard',
+  70: 'Antrian / Waiting Bay',
   80: 'Proses Perbaikan',
   90: 'QC Perbaikan',
   100: 'Ready Bay & Closing Admin',
@@ -38,6 +38,11 @@ const formatDateTime = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('id-ID');
+};
+
+const formatStationValue = (value) => {
+  if (Array.isArray(value)) return value.join(', ');
+  return String(value);
 };
 
 export default function MechanicCompletedDetail() {
@@ -182,7 +187,7 @@ export default function MechanicCompletedDetail() {
                     <Text style={styles.formTitle}>Isian Form</Text>
                     {stationEntries.map(([k, v]) => (
                       <Text key={`${step.stepOrder}-${k}`} style={styles.formItem}>
-                        {pretty(k)}: {Array.isArray(v) ? JSON.stringify(v) : String(v)}
+                        {pretty(k)}: {formatStationValue(v)}
                       </Text>
                     ))}
                   </View>

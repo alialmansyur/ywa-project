@@ -16,7 +16,7 @@ const mapUser = (raw) => ({
 
 export const authService = {
   login: async (login, password) => {
-    const response = await apiClient.post('/auth/login', { login, password, client_category: 'mobile' });
+    const response = await apiClient.post('/auth/login', { login, password, client_category: 'mobile', client_app: 'mobile' });
     return {
       token: response.data?.access_token || response.data?.token,
       user: mapUser(response.data?.user),

@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --page-bg: #f7f8f4;
+  --page-bg-soft: #f1f3ee;
+  --nav-bg: rgba(247, 248, 244, 0.94);
+  --panel-bg: rgba(255, 255, 255, 0.78);
+  --panel-bg-strong: rgba(255, 255, 255, 0.94);
+  --panel-border: rgba(15, 23, 42, 0.08);
+  --line-soft: rgba(15, 23, 42, 0.08);
+  --text-main: #15231f;
+  --text-soft: #115e59;
+  --text-muted: #4f625b;
+  --text-faint: #6f817a;
+  --accent-soft: rgba(13, 148, 136, 0.09);
+  --accent-sky: rgba(14, 165, 233, 0.06);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #0b1518;
+  --page-bg-soft: #102026;
+  --nav-bg: rgba(11, 21, 24, 0.82);
+  --panel-bg: rgba(16, 32, 38, 0.76);
+  --panel-bg-strong: rgba(16, 32, 38, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.1);
+  --text-main: #edf5ef;
+  --text-soft: #5eead4;
+  --text-muted: #a4b5af;
+  --text-faint: #839790;
+  --accent-soft: rgba(45, 212, 191, 0.18);
+  --accent-sky: rgba(56, 189, 248, 0.14);
+}
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply m-0 min-h-screen bg-[var(--page-bg)] font-body antialiased transition-colors duration-300;
+    background-image:
+      radial-gradient(circle at top left, rgba(13, 148, 136, 0.06), transparent 22%),
+      radial-gradient(circle at 85% 12%, rgba(14, 165, 233, 0.04), transparent 20%),
+      linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-soft) 100%);
+    color: var(--text-main);
+  }
+
+  a {
+    @apply no-underline;
+  }
+
+  button,
+  a {
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400;
+  }
+}
+
+@layer components {
+  .access-tile {
+    background:
+      linear-gradient(180deg, var(--panel-bg-strong), var(--panel-bg)),
+      radial-gradient(circle at top, var(--accent-soft), transparent 46%);
+    border-color: var(--panel-border);
+    @apply flex h-full min-h-[20rem] flex-col rounded-[2rem] border p-7 backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-brand-500/25 hover:shadow-[0_26px_70px_rgba(15,23,42,0.08)];
+  }
+
+  .section-eyebrow {
+    @apply inline-flex items-center rounded-full border border-emerald-900/20 bg-emerald-900 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.24em] text-white dark:border-brand-300/20 dark:bg-brand-400/10 dark:text-brand-300;
+  }
+
+  .primary-action {
+    @apply inline-flex items-center justify-center rounded-full bg-brand-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_18px_40px_rgba(15,118,110,0.2)] transition duration-200 hover:-translate-y-0.5 hover:bg-brand-700;
+  }
+
+  .secondary-action {
+    @apply inline-flex items-center justify-center rounded-full border border-[var(--panel-border)] bg-white/70 px-6 py-3.5 text-sm font-semibold text-[var(--text-main)] transition duration-200 hover:-translate-y-0.5 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10;
+  }
+
+  .nav-link {
+    @apply rounded-full px-4 py-2 text-sm font-semibold text-[var(--text-muted)] transition hover:bg-white/60 hover:text-[var(--text-main)] dark:hover:bg-white/5;
+  }
+
+  .footer-link {
+    @apply font-medium text-[var(--text-soft)] transition hover:text-[var(--text-main)];
+  }
+}

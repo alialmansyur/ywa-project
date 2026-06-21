@@ -18,7 +18,6 @@ export function DashboardAccessTokenPage() {
   const [expiresInDays, setExpiresInDays] = useState(30)
   const [current, setCurrent] = useState(null)
   const [history, setHistory] = useState([])
-  const [latestPlainPin, setLatestPlainPin] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
@@ -44,8 +43,6 @@ export function DashboardAccessTokenPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expires_in_days: Number(expiresInDays) || 30 }),
       })
-      const pin = String(res?.data?.pin || '')
-      setLatestPlainPin(pin)
       await swal.fire({ icon: 'success', title: 'Berhasil', text: 'PIN dashboard baru berhasil dibuat.' })
       await fetchData()
     } catch (error) {
@@ -67,8 +64,8 @@ export function DashboardAccessTokenPage() {
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-6 text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-2">Token Aktif</p>
             <div className="flex items-center justify-center gap-2">
-              <p className="text-4xl md:text-5xl font-bold tracking-[0.2em] text-slate-900 dark:text-white">
-                {showToken ? (latestPlainPin || current?.masked_pin || '-- ----') : '••••••'}
+              <p className="dashboard-access-token-value text-4xl md:text-5xl font-bold tracking-[0.2em]">
+                {showToken ? (current?.plain_pin || current?.masked_pin || '-- ----') : '••••••'}
               </p>
               <button
                 type="button"
@@ -98,6 +95,11 @@ export function DashboardAccessTokenPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Expired: {fmtDateTime(current?.expires_at)} | Last used: {fmtDateTime(current?.last_used_at)}
             </p>
+            {showToken && !current?.plain_pin ? (
+              <p className="text-xs text-amber-600 dark:text-amber-300 mt-3">
+                PIN aktif lama belum tersimpan terenkripsi. Generate satu token baru agar 6 digit penuh bisa dilihat kembali.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-end justify-center gap-2">

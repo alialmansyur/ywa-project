@@ -12,7 +12,7 @@ import { useActiveAssetStore } from '../../../../stores/active-asset.store';
 import { getCurrentMonthRange } from '../../../../utils/dateRange';
 
 const toDisplayStatus = (raw) => String(raw || '').replaceAll('_', ' ').toUpperCase();
-const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
+const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'CREATE_WO', 'WAITING_BAY', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 
 const resolveStatus = (wo, process) => {
   const base = String(wo?.status || '').toLowerCase();

@@ -56,6 +56,15 @@ export async function postJson(path, body = {}, config = {}) {
   }
 }
 
+export async function putJson(path, body = {}, config = {}) {
+  try {
+    const response = await api.put(path, body, config)
+    return response.data
+  } catch (error) {
+    throw normalizeError(error)
+  }
+}
+
 export async function revokeSession() {
   try {
     await api.post('/auth/logout')

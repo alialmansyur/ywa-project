@@ -254,7 +254,7 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
 
 /* Light theme sidebar: only active menu has background */
 .theme-light #sidebar nav > div:first-child {
-  color: #708375 !important;
+  color: #4b5d54 !important;
   font-weight: 700;
   letter-spacing: 0.08em;
   padding-top: 0.5rem;
@@ -264,7 +264,7 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
 .theme-light #sidebar nav a,
 .theme-light #sidebar nav button {
   background: transparent !important;
-  color: #6c7b72 !important;
+  color: #1f2a24 !important;
   border: 1px solid transparent !important;
   box-shadow: none !important;
   transition-property: background-color, color, box-shadow !important;
@@ -273,7 +273,7 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
 .theme-light #sidebar nav a:hover,
 .theme-light #sidebar nav button:hover {
   background: rgba(16, 185, 129, 0.05) !important;
-  color: #325244 !important;
+  color: #111915 !important;
 }
 
 .theme-light #sidebar nav a[class*="bg-blue-500"],
@@ -285,7 +285,7 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
 
 .theme-light #sidebar nav a svg,
 .theme-light #sidebar nav button svg {
-  color: #7b8d82 !important;
+  color: #33413a !important;
 }
 
 .theme-light #sidebar nav a[class*="bg-blue-500"] svg,
@@ -301,12 +301,12 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
 
 .theme-light #sidebar nav .pl-4 a {
   border-radius: 0.8rem !important;
-  color: #6c7b72 !important;
+  color: #24312b !important;
 }
 
 .theme-light #sidebar nav .pl-4 a:hover {
   background: rgba(16, 185, 129, 0.05) !important;
-  color: #325244 !important;
+  color: #111915 !important;
 }
 
 .theme-light #sidebar nav .pl-4 a[class*="bg-blue-500"] {
@@ -362,6 +362,14 @@ html:not(.theme-light) .admin-ui-root button[class*="bg-orange-500/"] {
   background: rgba(16, 185, 129, 0.12) !important;
   color: #047857 !important;
   box-shadow: none !important;
+}
+
+.dashboard-access-token-value {
+  color: #ffffff !important;
+}
+
+.theme-light .dashboard-access-token-value {
+  color: #111915 !important;
 }
 
 /* Global blue -> green remap for admin pages (without changing component structure/logic) */

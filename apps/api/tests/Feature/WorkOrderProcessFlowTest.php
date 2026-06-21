@@ -192,6 +192,71 @@ class WorkOrderProcessFlowTest extends TestCase
         $this->assertSame(1, InventoryTransaction::query()->where('reference_id', $workOrder->id)->count());
     }
 
+    public function test_workshop_bay_template_places_create_wo_before_waiting_bay_and_timeline_marks_step_in(): void
+    {
+        $this->seed();
+
+        $user = User::where('email', 'mechanic@tapg.local')->firstOrFail();
+        $user->givePermissionTo('execute work-orders');
+
+        $category = AssetCategory::query()->create(['name' => 'Excavator']);
+        $asset = Asset::query()->create([
+            'code' => 'EXC-T-003',
+            'name' => 'Excavator Test 003',
+            'category_id' => $category->id,
+            'status' => 'active',
+        ]);
+
+        $supervisor = User::where('email', 'supervisor@tapg.local')->firstOrFail();
+
+        $workOrder = WorkOrder::query()->create([
+            'code' => 'WO-TEST-ORDER-001',
+            'asset_id' => $asset->id,
+            'type' => 'preventive',
+            'priority' => 'medium',
+            'title' => 'Service order swap test',
+            'status' => 'approved',
+            'supervisor_id' => $supervisor->id,
+            'created_by' => $supervisor->id,
+        ]);
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/start")
+            ->assertOk();
+
+        $process = $this->actingAsApi($user)
+            ->getJson("/api/v1/work-orders/{$workOrder->id}/process")
+            ->assertOk()
+            ->json();
+
+        $stepLogs = collect($process['instances'][0]['step_logs'] ?? []);
+        $createWoStepOrder = (int) $stepLogs->firstWhere('step_code', 'CREATE_WO')['step_order'];
+        $waitingBayStepOrder = (int) $stepLogs->firstWhere('step_code', 'WAITING_BAY')['step_order'];
+
+        $this->assertSame(60, $createWoStepOrder);
+        $this->assertSame(70, $waitingBayStepOrder);
+
+        $washingStepOrder = (int) $stepLogs->firstWhere('step_code', 'WASHING_BAY')['step_order'];
+
+        $this->actingAsApi($user)
+            ->postJson("/api/v1/work-orders/{$workOrder->id}/process/steps/{$washingStepOrder}/in", ['notes' => 'Mulai washing'])
+            ->assertOk();
+
+        $timeline = $this->actingAsApi($user)
+            ->getJson("/api/v1/work-orders/{$workOrder->id}/timeline")
+            ->assertOk()
+            ->json();
+
+        $stepInEvent = collect($timeline)->first(fn ($row) => ($row['event_key'] ?? $row['title'] ?? null) === 'STEP_IN');
+
+        $this->assertNotNull($stepInEvent);
+        $this->assertSame('Step Mulai', $stepInEvent['event_label']);
+        $this->assertSame('in_progress', $stepInEvent['state']);
+        $this->assertSame('WASHING_BAY', $stepInEvent['step_code']);
+        $this->assertSame($washingStepOrder, (int) $stepInEvent['source_step_order']);
+        $this->assertNotEmpty($stepInEvent['started_at']);
+    }
+
     private function actingAsApi(User $user): self
     {
         $token = $user->createToken('test-token')->plainTextToken;

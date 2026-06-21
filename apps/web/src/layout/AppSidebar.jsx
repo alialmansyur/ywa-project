@@ -16,7 +16,7 @@ export function AppSidebar({
     <aside className="app-sidebar">
       <div className="sidebar-top">
         <div className="sidebar-logo">
-          <img src="/logo-ywa.png" alt="Logo YWA" className="sidebar-logo-image" />
+          <img src="/logo-app.png" alt="Logo YWA" className="sidebar-logo-image" />
         </div>
       </div>
 

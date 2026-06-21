@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Animated, StatusBar, Image } from 'react-native';
 import { router } from 'expo-router';
 import { theme } from '../../../constants/AppTheme';
-import { Wrench } from 'lucide-react-native';
 import { useAuthStore } from '../../../stores/auth.store';
 
 export default function SplashScreen() {
@@ -47,10 +46,10 @@ export default function SplashScreen() {
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primaryDark} />
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
         <View style={styles.iconBox}>
-          <Wrench size={48} color={theme.colors.primary} />
+          <Image source={require('../../../assets/images/logo-app.png')} style={styles.logoImage} resizeMode="contain" />
         </View>
-        <Text style={styles.title}>WTS</Text>
-        <Text style={styles.subtitle}>Workshop Tracking System</Text>
+        <Text style={styles.title}>YWA</Text>
+        <Text style={styles.subtitle}>YWA Maintenance</Text>
       </Animated.View>
     </View>
   );
@@ -76,6 +75,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
+  },
+  logoImage: {
+    width: 64,
+    height: 64,
   },
   title: {
     ...theme.typography.h1,

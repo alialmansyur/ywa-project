@@ -174,6 +174,7 @@ class WorkOrderProcessService
                 ]);
             }
 
+            $stationData = $this->normalizeStationData($step->step_code, $stationData);
             $this->validateStationFeedback($step->step_code, $notes, $stationData);
 
             // Phase 7 Validation
@@ -453,6 +454,11 @@ class WorkOrderProcessService
 
     public function timeline(WorkOrder $workOrder): array
     {
+        $stepLogs = $workOrder->processStepLogs()
+            ->orderBy('step_order')
+            ->get(['step_order', 'step_code', 'step_name', 'process_in_at', 'process_out_at']);
+        $stepByOrder = $stepLogs->keyBy(fn ($step) => (int) $step->step_order);
+
         $statusLogs = $workOrder->statusLogs()
             ->with('changedBy:id,name')
             ->orderBy('changed_at')
@@ -463,18 +469,38 @@ class WorkOrderProcessService
                 'title' => trim(($log->from_status ? $log->from_status.' -> ' : '').$log->to_status),
                 'actor' => $log->changedBy?->name,
                 'notes' => $log->notes,
+                'state' => $this->resolveTimelineState($log->to_status),
             ]);
 
         $events = $workOrder->processEvents()
             ->orderBy('triggered_at')
             ->get()
-            ->map(fn ($event) => [
-                'type' => 'process_event',
-                'time' => $event->triggered_at,
-                'title' => $event->event_key,
-                'actor_id' => $event->triggered_by,
-                'payload' => $event->payload_json,
-            ]);
+            ->map(function ($event) use ($stepByOrder) {
+                $payload = is_array($event->payload_json) ? $event->payload_json : [];
+                $sourceStepOrder = $payload['source_step_order'] ?? $event->source_step_order;
+                $targetStepOrder = $payload['target_step_order'] ?? $event->target_step_order;
+                $sourceStep = $sourceStepOrder !== null ? $stepByOrder->get((int) $sourceStepOrder) : null;
+                $targetStep = $targetStepOrder !== null ? $stepByOrder->get((int) $targetStepOrder) : null;
+
+                return [
+                    'type' => 'process_event',
+                    'time' => $event->triggered_at,
+                    'title' => $event->event_key,
+                    'event_key' => $event->event_key,
+                    'event_label' => $this->resolveEventLabel($event->event_key),
+                    'state' => $this->resolveTimelineState($event->event_key),
+                    'actor_id' => $event->triggered_by,
+                    'source_step_order' => $sourceStepOrder,
+                    'target_step_order' => $targetStepOrder,
+                    'step_code' => $payload['step_code'] ?? $sourceStep?->step_code ?? $targetStep?->step_code,
+                    'step_name' => $payload['step_name'] ?? $sourceStep?->step_name ?? $targetStep?->step_name,
+                    'source_step_name' => $sourceStep?->step_name,
+                    'target_step_name' => $targetStep?->step_name,
+                    'started_at' => $sourceStep?->process_in_at?->toISOString(),
+                    'ended_at' => $sourceStep?->process_out_at?->toISOString(),
+                    'payload' => $payload,
+                ];
+            });
 
         return $statusLogs->concat($events)->sortBy('time')->values()->all();
     }
@@ -575,8 +601,16 @@ class WorkOrderProcessService
         }
 
         $value = static fn (string $key): string => trim((string) ($stationData[$key] ?? ''));
+        $values = static fn (string $key): array => collect($stationData[$key] ?? [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
         $require = static function (string $key, string $message) use ($value): void {
             abort_if($value($key) === '', 422, $message);
+        };
+        $requireArray = static function (string $key, string $message) use ($values): void {
+            abort_if(count($values($key)) === 0, 422, $message);
         };
         $ensureIn = static function (string $key, array $allowed, string $message) use ($value): void {
             $current = $value($key);
@@ -584,6 +618,13 @@ class WorkOrderProcessService
                 return;
             }
             abort_if(! in_array($current, $allowed, true), 422, $message);
+        };
+        $ensureEveryIn = static function (string $key, array $allowed, string $message) use ($values): void {
+            $current = $values($key);
+            if ($current === []) {
+                return;
+            }
+            abort_if(collect($current)->contains(fn ($item) => ! in_array($item, $allowed, true)), 422, $message);
         };
 
         switch ($stepCode) {
@@ -602,8 +643,10 @@ class WorkOrderProcessService
             case 'INSPECTION_PKB':
                 $require('inspection_result', 'Hasil inspeksi wajib dipilih.');
                 $require('work_plan', 'Rencana pekerjaan wajib dipilih.');
+                $requireArray('inspection_categories', 'Kategori pekerjaan wajib dipilih minimal 1 item.');
                 $ensureIn('inspection_result', ['NORMAL', 'ABNORMAL', 'FOLLOW_UP'], 'Hasil inspeksi tidak valid.');
                 $ensureIn('work_plan', ['LANJUT_CHECKING', 'LANJUT_REPAIR', 'MENUNGGU_APPROVAL'], 'Rencana pekerjaan tidak valid.');
+                $ensureEveryIn('inspection_categories', ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem'], 'Kategori pekerjaan tidak valid.');
                 break;
 
             case 'CHECKING':
@@ -630,7 +673,8 @@ class WorkOrderProcessService
 
             case 'REPAIR':
                 $require('repair_action', 'Aksi perbaikan wajib diisi.');
-                $ensureIn('technical_action', ['ADJUSTMENT', 'REPAIR', 'REPLACE', 'CLEANING'], 'Tindakan teknis tidak valid.');
+                $requireArray('technical_actions', 'Tindakan teknis wajib dipilih minimal 1 item.');
+                $ensureEveryIn('technical_actions', ['ADJUSTMENT', 'REPAIR', 'REPLACE', 'CLEANING'], 'Tindakan teknis tidak valid.');
                 $ensureIn('obstacle', ['TIDAK_ADA', 'PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'], 'Kendala perbaikan tidak valid.');
                 if (in_array($value('obstacle'), ['PART', 'TOOL', 'APPROVAL', 'WAKTU', 'LAINNYA'], true)) {
                     $require('hold_reason', 'Detail kendala wajib diisi bila repair mengalami obstacle.');
@@ -639,7 +683,7 @@ class WorkOrderProcessService
 
             case 'QC':
                 $require('qc_result', 'Hasil QC wajib dipilih.');
-                $require('qc_parameter', 'Parameter QC wajib diisi.');
+                $requireArray('qc_parameters', 'Parameter QC wajib dipilih minimal 1 item.');
                 $ensureIn('qc_result', ['OK', 'NG'], 'Hasil QC tidak valid.');
                 if ($value('qc_result') === 'NG') {
                     $require('rework_note', 'Catatan rework wajib diisi bila hasil QC NG.');
@@ -736,6 +780,50 @@ class WorkOrderProcessService
                 'notes' => 'Reservasi part dari PART_SUPPLY',
             ]);
         }
+    }
+
+    private function normalizeStationData(string $stepCode, array $stationData): array
+    {
+        if ($stationData === []) {
+            return [];
+        }
+
+        if ($stepCode === 'INSPECTION_PKB') {
+            $stationData['inspection_categories'] = $this->normalizeStationMultiValue($stationData['inspection_categories'] ?? null);
+        }
+
+        if ($stepCode === 'REPAIR') {
+            $stationData['technical_actions'] = $this->normalizeStationMultiValue($stationData['technical_actions'] ?? ($stationData['technical_action'] ?? null));
+            $stationData['technical_action'] = implode(', ', $stationData['technical_actions']);
+        }
+
+        if ($stepCode === 'QC') {
+            $stationData['qc_parameters'] = $this->normalizeStationMultiValue($stationData['qc_parameters'] ?? ($stationData['qc_parameter'] ?? null));
+            $stationData['qc_parameter'] = implode(', ', $stationData['qc_parameters']);
+        }
+
+        return $stationData;
+    }
+
+    private function normalizeStationMultiValue($value): array
+    {
+        if (is_array($value)) {
+            return collect($value)
+                ->map(fn ($item) => trim((string) $item))
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            return collect(explode(',', $value))
+                ->map(fn ($item) => trim((string) $item))
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        return [];
     }
 
     private function shouldReservePartsForStep(WoProcessInstance $instance, string $stepCode, array $partItems): bool
@@ -859,23 +947,82 @@ class WorkOrderProcessService
 
     private function addEvent(WorkOrder $workOrder, string $eventKey, ?int $sourceStep, ?int $targetStep, ?int $actorId, array $payload): void
     {
+        $eventPayload = [
+            'source_step_order' => $sourceStep,
+            'target_step_order' => $targetStep,
+            ...$this->resolveEventStepMeta($workOrder, $sourceStep, $targetStep),
+            ...$payload,
+        ];
+
         WoProcessEvent::create([
             'wo_id' => $workOrder->id,
             'event_key' => $eventKey,
             'source_step_order' => $sourceStep,
             'target_step_order' => $targetStep,
             'triggered_by' => $actorId,
-            'payload_json' => $payload,
+            'payload_json' => $eventPayload,
             'triggered_at' => now(),
         ]);
 
         $actor = $actorId ? User::query()->find($actorId) : null;
-        $meta = [
-            'source_step_order' => $sourceStep,
-            'target_step_order' => $targetStep,
-            ...$payload,
+        app(NotificationDispatcherService::class)->dispatchWorkOrderEvent($workOrder, $eventKey, $actor, $eventPayload);
+    }
+
+    private function resolveEventStepMeta(WorkOrder $workOrder, ?int $sourceStep, ?int $targetStep): array
+    {
+        $stepOrders = array_values(array_filter([$sourceStep, $targetStep], fn ($value) => $value !== null));
+        if ($stepOrders === []) {
+            return [];
+        }
+
+        $stepLogs = $workOrder->processStepLogs()
+            ->whereIn('step_order', $stepOrders)
+            ->get()
+            ->keyBy(fn ($step) => (int) $step->step_order);
+
+        $source = $sourceStep !== null ? $stepLogs->get((int) $sourceStep) : null;
+        $target = $targetStep !== null ? $stepLogs->get((int) $targetStep) : null;
+
+        return [
+            'step_code' => $source?->step_code ?? $target?->step_code,
+            'step_name' => $source?->step_name ?? $target?->step_name,
+            'source_step_code' => $source?->step_code,
+            'source_step_name' => $source?->step_name,
+            'target_step_code' => $target?->step_code,
+            'target_step_name' => $target?->step_name,
         ];
-        app(NotificationDispatcherService::class)->dispatchWorkOrderEvent($workOrder, $eventKey, $actor, $meta);
+    }
+
+    private function resolveEventLabel(string $eventKey): string
+    {
+        return match ($eventKey) {
+            'PROCESS_STARTED' => 'Process Dimulai',
+            'PROCESS_COMPLETED' => 'Process Selesai',
+            'STEP_IN' => 'Step Mulai',
+            'STEP_OUT' => 'Step Selesai',
+            'STEP_HOLD' => 'Step Di-hold',
+            'STEP_RESUME' => 'Step Dilanjutkan',
+            'STEP_APPROVED' => 'Step Disetujui',
+            'STEP_REJECTED' => 'Step Ditolak',
+            'NEXT_STEP_READY' => 'Step Berikutnya Siap',
+            'BAY_IN' => 'Masuk Bay',
+            'BAY_OUT' => 'Keluar Bay',
+            default => str_replace('_', ' ', $eventKey),
+        };
+    }
+
+    private function resolveTimelineState(?string $key): ?string
+    {
+        $value = strtoupper((string) $key);
+
+        return match ($value) {
+            'IN_PROGRESS', 'PROCESS_STARTED', 'STEP_IN', 'STEP_RESUME' => 'in_progress',
+            'PROCESS_COMPLETED', 'STEP_OUT', 'STEP_APPROVED', 'COMPLETED', 'DONE' => 'completed',
+            'STEP_HOLD', 'ON_HOLD', 'HOLD' => 'hold',
+            'STEP_REJECTED', 'REJECTED' => 'rejected',
+            'NEXT_STEP_READY', 'READY' => 'ready',
+            default => null,
+        };
     }
 
     private function setWorkOrderStatus(WorkOrder $workOrder, string $newStatus, User $actor, ?string $notes = null): void

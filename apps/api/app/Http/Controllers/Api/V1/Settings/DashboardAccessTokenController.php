@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -14,6 +15,19 @@ use Illuminate\Support\Facades\Hash;
  */
 class DashboardAccessTokenController extends Controller
 {
+    private function revealPin(?string $encryptedPin): ?string
+    {
+        if (! is_string($encryptedPin) || trim($encryptedPin) === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($encryptedPin);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function maskPin(string $pin): string
     {
         return substr($pin, 0, 2) . '****';
@@ -40,6 +54,7 @@ class DashboardAccessTokenController extends Controller
             ->select([
                 'dashboard_access_tokens.id',
                 'dashboard_access_tokens.masked_pin',
+                'dashboard_access_tokens.encrypted_pin',
                 'dashboard_access_tokens.expires_at',
                 'dashboard_access_tokens.last_used_at',
                 'dashboard_access_tokens.created_at',
@@ -70,6 +85,11 @@ class DashboardAccessTokenController extends Controller
                 'generated_user.name as generated_by_name',
             ])
             ->get();
+
+        if ($current) {
+            $current->plain_pin = $this->revealPin($current->encrypted_pin ?? null);
+            unset($current->encrypted_pin);
+        }
 
         return response()->json([
             'data' => [
@@ -110,6 +130,7 @@ class DashboardAccessTokenController extends Controller
             DB::table('dashboard_access_tokens')->insert([
                 'user_id' => $adminUser->id,
                 'token_hash' => Hash::make($pin),
+                'encrypted_pin' => Crypt::encryptString($pin),
                 'masked_pin' => $masked,
                 'expires_at' => $expiresAt,
                 'is_active' => true,
@@ -143,4 +164,3 @@ class DashboardAccessTokenController extends Controller
         ]);
     }
 }
-

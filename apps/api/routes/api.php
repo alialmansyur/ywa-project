@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\Settings\ApprovalController;
 use App\Http\Controllers\Api\V1\Settings\NotificationTestController;
 use App\Http\Controllers\Api\V1\Settings\DatabaseBackupController;
 use App\Http\Controllers\Api\V1\Settings\DashboardAccessTokenController;
+use App\Http\Controllers\Api\V1\Settings\DashboardSettingController;
 use App\Http\Controllers\Api\V1\Finding\FindingController;
 use App\Http\Controllers\Api\V1\BreakdownReport\BreakdownReportController;
 
@@ -314,6 +315,8 @@ Route::prefix('v1')->group(function () {
             Route::get('database-backups/{file}/download', [DatabaseBackupController::class, 'download'])->name('database-backups.download')->middleware('permission:manage settings database-backup');
             Route::get('dashboard-access-token', [DashboardAccessTokenController::class, 'index'])->name('dashboard-access-token.index')->middleware('permission:manage settings dashboard-access-token');
             Route::post('dashboard-access-token/rotate', [DashboardAccessTokenController::class, 'rotate'])->name('dashboard-access-token.rotate')->middleware('permission:manage settings dashboard-access-token');
+            Route::get('dashboard-settings', [DashboardSettingController::class, 'show'])->name('dashboard-settings.show')->middleware('permission:view work-orders|manage settings dashboard-settings');
+            Route::put('dashboard-settings', [DashboardSettingController::class, 'update'])->name('dashboard-settings.update')->middleware('permission:manage settings dashboard-settings');
 
         });
 

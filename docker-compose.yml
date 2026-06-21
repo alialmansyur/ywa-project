@@ -219,6 +219,27 @@ services:
       - "${APP_BIND_HOST:-0.0.0.0}:${ADMIN_PORT:-8002}:8002"
     networks: [tapg-network]
 
+  react-landing:
+    image: node:20-alpine
+    container_name: tapg-react-landing
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install --legacy-peer-deps && npm run build && npm run preview -- --host 0.0.0.0 --port 8008"
+    environment:
+      TZ: ${TZ:-Asia/Makassar}
+      VITE_ADMIN_URL: ${VITE_ADMIN_URL:-http://localhost:8002}
+      VITE_DASHBOARD_URL: ${VITE_DASHBOARD_URL:-http://localhost:8001}
+      VITE_APK_BASE_PATH: ${VITE_APK_BASE_PATH:-/apk}
+      VITE_APP_TITLE: ${VITE_APP_TITLE:-YWA Maintenance Hub}
+      VITE_ENV_LABEL: ${VITE_ENV_LABEL:-LOCAL}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./apps/landing:/app
+      - ./apk:/app/public/apk:ro
+    ports:
+      - "${APP_BIND_HOST:-0.0.0.0}:${LANDING_PORT:-8008}:8008"
+    networks: [tapg-network]
+
   minio:
     image: minio/minio:latest
     container_name: tapg-minio

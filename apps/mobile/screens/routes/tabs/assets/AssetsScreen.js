@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,22 +23,44 @@ export default function AssetsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [assigningAssetId, setAssigningAssetId] = useState(null);
 
-  React.useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await assetsService.getAll(1, 50);
-        setAssets(res.items || []);
-        await loadCurrentAssignment();
-      } catch (_e) {
-        setAssets([]);
-      } finally {
-        setLoading(false);
+  const loadAssets = useCallback(async ({ nextPage = 1, query = '', reset = false } = {}) => {
+    try {
+      if (reset) {
+        setLoading(true);
+      } else if (nextPage > 1) {
+        setLoadingMore(true);
       }
-    };
-    load();
+
+      const res = await assetsService.getAll(nextPage, 20, query || undefined);
+      setAssets((prev) => (reset ? (res.items || []) : [...prev, ...(res.items || [])]));
+      setPage(res.page || nextPage);
+      setHasMore(Boolean(res.hasMore));
+      if (reset) {
+        await loadCurrentAssignment();
+      }
+    } catch (_e) {
+      if (reset) {
+        setAssets([]);
+        setHasMore(false);
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   }, [loadCurrentAssignment]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadAssets({ nextPage: 1, query: searchQuery.trim(), reset: true });
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [loadAssets, searchQuery]);
 
   const handleAssign = async (id) => {
     setAssigningAssetId(String(id));
@@ -69,17 +91,7 @@ export default function AssetsScreen() {
     }
   };
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const menuBarContentPadding = getMenuBarContentPadding(insets.bottom);
-  const filteredAssets = assets.filter((item) => {
-    if (!normalizedSearchQuery) return true;
-
-    return [
-      item.code,
-      item.name,
-      item.plateNo,
-    ].some((value) => String(value || '').toLowerCase().includes(normalizedSearchQuery));
-  });
 
   const renderItem = ({ item }) => {
     const isAssigned = String(item.id) === String(activeAsset?.id || '');
@@ -132,6 +144,20 @@ export default function AssetsScreen() {
     );
   };
 
+  const handleEndReached = () => {
+    if (loading || loadingMore || !hasMore) return;
+    loadAssets({ nextPage: page + 1, query: searchQuery.trim(), reset: false });
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Stack.Screen
@@ -155,10 +181,18 @@ export default function AssetsScreen() {
           <Card style={styles.card}><Skeleton height={140} width="100%" /></Card>
         </View>
       ) : (
-        <FlatList data={filteredAssets} keyExtractor={(item) => String(item.id)} renderItem={renderItem} contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]} />
+        <FlatList
+          data={assets}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.35}
+          ListFooterComponent={renderFooter}
+          contentContainerStyle={[styles.list, { paddingBottom: menuBarContentPadding }]}
+        />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, searchContainer: { padding: theme.spacing.md, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border }, searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.full, paddingHorizontal: theme.spacing.md, height: 44 }, searchInput: { flex: 1, marginLeft: theme.spacing.sm, ...theme.typography.body, color: theme.colors.text }, list: { padding: theme.spacing.md }, card: { marginBottom: theme.spacing.md }, cardActive: { borderColor: theme.colors.primary, borderWidth: 2 }, cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: theme.spacing.md }, titleRow: { flexDirection: 'row', alignItems: 'flex-start', flex: 1 }, titleText: { marginLeft: theme.spacing.md, flex: 1 }, codeText: { ...theme.typography.h3, color: theme.colors.text }, nameText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: 2 }, nopolText: { ...theme.typography.caption, fontWeight: 'bold', marginTop: 4, color: theme.colors.text }, cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md }, footerLeft: { flex: 1 }, typeText: { ...theme.typography.caption, fontWeight: '600', marginBottom: 6 }, detailLink: { flexDirection: 'row', alignItems: 'center' }, detailLinkText: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.primary, marginLeft: 4 }, assignBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full, borderWidth: 1, borderColor: theme.colors.primary }, assignedBtn: { backgroundColor: theme.colors.primary }, assignBtnText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.primary, fontSize: 14 }, assignedBtnText: { color: '#fff' }, disabledBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.border }, disabledBtnText: { ...theme.typography.caption, fontWeight: '600', color: theme.colors.textSecondary } });
+const styles = StyleSheet.create({ container: { flex: 1, backgroundColor: theme.colors.surface }, searchContainer: { padding: theme.spacing.md, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: theme.colors.border }, searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.borderRadius.full, paddingHorizontal: theme.spacing.md, height: 44 }, searchInput: { flex: 1, marginLeft: theme.spacing.sm, ...theme.typography.body, color: theme.colors.text }, list: { padding: theme.spacing.md }, card: { marginBottom: theme.spacing.md }, cardActive: { borderColor: theme.colors.primary, borderWidth: 2 }, cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: theme.spacing.md }, titleRow: { flexDirection: 'row', alignItems: 'flex-start', flex: 1 }, titleText: { marginLeft: theme.spacing.md, flex: 1 }, codeText: { ...theme.typography.h3, color: theme.colors.text }, nameText: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: 2 }, nopolText: { ...theme.typography.caption, fontWeight: 'bold', marginTop: 4, color: theme.colors.text }, cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.md }, footerLeft: { flex: 1 }, typeText: { ...theme.typography.caption, fontWeight: '600', marginBottom: 6 }, detailLink: { flexDirection: 'row', alignItems: 'center' }, detailLinkText: { ...theme.typography.caption, fontWeight: 'bold', color: theme.colors.primary, marginLeft: 4 }, assignBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full, borderWidth: 1, borderColor: theme.colors.primary }, assignedBtn: { backgroundColor: theme.colors.primary }, assignBtnText: { ...theme.typography.body, fontWeight: '600', color: theme.colors.primary, fontSize: 14 }, assignedBtnText: { color: '#fff' }, disabledBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.border }, disabledBtnText: { ...theme.typography.caption, fontWeight: '600', color: theme.colors.textSecondary }, footerLoader: { paddingVertical: theme.spacing.md } });

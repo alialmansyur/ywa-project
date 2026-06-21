@@ -82,6 +82,8 @@ class AssetController extends Controller
                 $q->where(function ($sq) use ($search) {
                     $sq->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('plate_number', 'like', "%{$search}%")
+                        ->orWhere('veh_plate_no', 'like', "%{$search}%")
                         ->orWhereHas('activeAssignment.user', function ($userQuery) use ($search) {
                             $userQuery->where('name', 'like', "%{$search}%")
                                 ->orWhere('email', 'like', "%{$search}%");
@@ -90,7 +92,8 @@ class AssetController extends Controller
             })
             ->orderBy($request->sort_by ?? 'created_at', $request->sort_dir ?? 'desc');
 
-        $assets = $query->paginate($request->per_page ?? 15);
+        $perPage = max(1, min((int) ($request->per_page ?? 15), 100));
+        $assets = $query->paginate($perPage);
 
         return response()->json($assets);
     }

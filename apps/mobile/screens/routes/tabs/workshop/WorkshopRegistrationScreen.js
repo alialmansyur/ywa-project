@@ -21,15 +21,15 @@ import { getCurrentMonthRange } from '../../../../utils/dateRange';
 import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { AssetPickerField } from '../../../../components/common/AssetPickerField';
 
-const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
+const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'CREATE_WO', 'WAITING_BAY', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 const ACTIVE_WORKSHOP_STATUSES = ['registered', 'triage', 'pending', 'approved', 'in_progress', 'on_hold'];
 const HISTORY_VISIBLE_STATUSES = [...ACTIVE_WORKSHOP_STATUSES, 'completed'];
 const STATION_STEP_ORDER_TO_CODE = {
   30: 'WASHING_BAY',
   40: 'INSPECTION_PKB',
   50: 'CHECKING',
-  60: 'WAITING_BAY',
-  70: 'CREATE_WO',
+  60: 'CREATE_WO',
+  70: 'WAITING_BAY',
   80: 'REPAIR',
   90: 'QC',
   100: 'READY_BAY_CLOSE',

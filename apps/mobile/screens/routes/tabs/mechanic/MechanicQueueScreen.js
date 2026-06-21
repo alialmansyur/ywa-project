@@ -16,13 +16,13 @@ import { workOrdersService } from '../../../../services/work-orders.service';
 import { getMenuBarContentPadding } from '../../../../constants/menu-bar';
 import { useMechanicAccessGuard } from '../../../../hooks/useMechanicAccessGuard';
 
-const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'WAITING_BAY', 'CREATE_WO', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
+const STATION_STEP_CODES = ['WASHING_BAY', 'INSPECTION_PKB', 'CHECKING', 'CREATE_WO', 'WAITING_BAY', 'REPAIR', 'QC', 'READY_BAY_CLOSE', 'HANDOVER'];
 const STATION_STEP_ORDER_TO_CODE = {
   30: 'WASHING_BAY',
   40: 'INSPECTION_PKB',
   50: 'CHECKING',
-  60: 'WAITING_BAY',
-  70: 'CREATE_WO',
+  60: 'CREATE_WO',
+  70: 'WAITING_BAY',
   80: 'REPAIR',
   90: 'QC',
   100: 'READY_BAY_CLOSE',

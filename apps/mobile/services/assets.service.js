@@ -47,6 +47,7 @@ export const assetsService = {
       total: payload?.total ?? items.length,
       page: payload?.current_page ?? page,
       limit: payload?.per_page ?? limit,
+      lastPage: payload?.last_page ?? page,
       hasMore: (payload?.current_page ?? page) < (payload?.last_page ?? page),
     };
   },
