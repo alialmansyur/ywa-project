@@ -45,9 +45,7 @@ export default function SplashScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primaryDark} />
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        <View style={styles.iconBox}>
-          <Image source={require('../../../assets/images/logo-app.png')} style={styles.logoImage} resizeMode="contain" />
-        </View>
+        <Image source={require('../../../assets/images/logo-app-transparant.png')} style={styles.logoImage} resizeMode="contain" />
         <Text style={styles.title}>YWA</Text>
         <Text style={styles.subtitle}>YWA Maintenance</Text>
       </Animated.View>
@@ -65,20 +63,10 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  iconBox: {
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 24,
-    marginBottom: 24,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
   logoImage: {
-    width: 64,
-    height: 64,
+    width: 120,
+    height: 120,
+    marginBottom: 24,
   },
   title: {
     ...theme.typography.h1,

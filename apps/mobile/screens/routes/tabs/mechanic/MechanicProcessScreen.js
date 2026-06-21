@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -72,7 +72,7 @@ const WORK_PLAN_OPTIONS = [
   { label: 'Lanjut Repair', value: 'LANJUT_REPAIR' },
   { label: 'Menunggu Approval', value: 'MENUNGGU_APPROVAL' },
 ];
-const INSPECTION_CATEGORY_OPTIONS = ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem'];
+const INSPECTION_CATEGORY_OPTIONS = ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem', 'Engine', 'Hydraulic', 'Electrical', 'Safety', 'Body'];
 const OK_NG_OPTIONS = [
   { label: 'OK', value: 'OK' },
   { label: 'NG', value: 'NG' },
@@ -134,6 +134,59 @@ const STEP_HELPER_COPY = {
 };
 
 const resolveErrorMessage = (error, fallback) => error?.message || error?.response?.data?.message || fallback;
+const formatTime = (seconds) => {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const h = Math.floor(safeSeconds / 3600);
+  const m = Math.floor((safeSeconds % 3600) / 60);
+  const s = safeSeconds % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+function LiveTimerText({ status, startAt, fallbackSeconds, style }) {
+  const [elapsed, setElapsed] = useState(Math.max(0, Number(fallbackSeconds) || 0));
+
+  useEffect(() => {
+    if (status !== 'active' || !startAt) {
+      setElapsed(Math.max(0, Number(fallbackSeconds) || 0));
+      return undefined;
+    }
+
+    const syncElapsed = () => {
+      const nextElapsed = Math.floor((Date.now() - new Date(startAt).getTime()) / 1000);
+      setElapsed(Math.max(0, nextElapsed));
+    };
+
+    syncElapsed();
+    const interval = setInterval(syncElapsed, 1000);
+    return () => clearInterval(interval);
+  }, [fallbackSeconds, startAt, status]);
+
+  return <Text style={style}>{formatTime(elapsed)}</Text>;
+}
+
+function LiveDurationText({ status, startAt, fallbackMinutes, style }) {
+  const [durationMinutes, setDurationMinutes] = useState(Math.max(0, Number(fallbackMinutes) || 0));
+
+  useEffect(() => {
+    if (status !== 'active' || !startAt) {
+      setDurationMinutes(Math.max(0, Number(fallbackMinutes) || 0));
+      return undefined;
+    }
+
+    const syncDuration = () => {
+      const nextDuration = Math.floor((Date.now() - new Date(startAt).getTime()) / 60000);
+      setDurationMinutes(Math.max(0, nextDuration));
+    };
+
+    syncDuration();
+    const interval = setInterval(syncDuration, 1000);
+    return () => clearInterval(interval);
+  }, [fallbackMinutes, startAt, status]);
+
+  return <Text style={style}>Durasi: {durationMinutes} menit</Text>;
+}
+
+const formatStepTitle = (title) => String(title || '').replace(/\s*(\([^)]*\))$/, '\n$1');
 
 export default function MechanicProcessScreen() {
   const insets = useSafeAreaInsets();
@@ -148,13 +201,13 @@ export default function MechanicProcessScreen() {
   const [stepLogs, setStepLogs] = useState([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [status, setStatus] = useState('pending'); // pending, active, hold
-  const [timer, setTimer] = useState(0);
   const [partItems, setPartItems] = useState([]);
   const [note, setNote] = useState('');
   const [holdReason, setHoldReason] = useState('');
   const [proofFile, setProofFile] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [finishModalVisible, setFinishModalVisible] = useState(false);
+  const draftSaveTimeoutRef = useRef(null);
   const [finishForm, setFinishForm] = useState({
     pre_wash_condition: '',
     post_wash_condition: '',
@@ -189,19 +242,6 @@ export default function MechanicProcessScreen() {
     final_note: '',
   });
 
-  // Timer
-  useEffect(() => {
-    let interval = null;
-    if (status === 'active') {
-      interval = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [status]);
-
   const loadData = useCallback(async () => {
     if (isRestrictedRole || !work_order_id) return;
     try {
@@ -230,11 +270,6 @@ export default function MechanicProcessScreen() {
           const idx = STEP_CODES.indexOf(activeStep.step_code);
           setCurrentStepIndex(idx >= 0 ? idx : 0);
           setStatus('active');
-          // Calculate elapsed time
-          if (activeStep.process_in_at) {
-            const elapsed = Math.floor((Date.now() - new Date(activeStep.process_in_at).getTime()) / 1000);
-            setTimer(Math.max(0, elapsed));
-          }
         } else if (holdStep) {
           const idx = STEP_CODES.indexOf(holdStep.step_code);
           setCurrentStepIndex(idx >= 0 ? idx : 0);
@@ -243,7 +278,6 @@ export default function MechanicProcessScreen() {
           const idx = STEP_CODES.indexOf(nextReady.step_code);
           setCurrentStepIndex(idx >= 0 ? idx : 0);
           setStatus('pending');
-          setTimer(0);
         } else if (handoverDone || String(wo?.status || '').toLowerCase() === 'completed') {
           // All done
           setCurrentStepIndex(STEP_CODES.length - 1);
@@ -265,11 +299,6 @@ export default function MechanicProcessScreen() {
       setRefreshing(false);
     }
   }, [isRestrictedRole, work_order_id]);
-
-  useEffect(() => {
-    if (isRestrictedRole) return;
-    loadData();
-  }, [loadData, isRestrictedRole]);
 
   useEffect(() => {
     let mounted = true;
@@ -298,7 +327,10 @@ export default function MechanicProcessScreen() {
 
   useEffect(() => {
     if (isRestrictedRole || !work_order_id) return;
-    const saveDraft = async () => {
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+    draftSaveTimeoutRef.current = setTimeout(async () => {
       try {
         await AsyncStorage.setItem(
           `${DRAFT_PREFIX}${work_order_id}`,
@@ -311,9 +343,14 @@ export default function MechanicProcessScreen() {
           }),
         );
       } catch (_e) {}
+    }, 500);
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
     };
-    saveDraft();
-  }, [finishForm, holdReason, isRestrictedRole, note, partItems, proofFile, work_order_id]);
+  }, [draftSaveTimeoutRef, finishForm, holdReason, isRestrictedRole, note, partItems, proofFile, work_order_id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -529,7 +566,6 @@ export default function MechanicProcessScreen() {
       if (action === 'start') {
         await workshopService.stepIn(String(work_order_id), stepOrder, note || null);
         setStatus('active');
-        setTimer(0);
         showAlert({ type: 'success', title: 'Berhasil', message: `Tahap ${STEP_NAME_MAP[STEP_CODES[currentStepIndex]] || STEP_CODES[currentStepIndex]} dimulai.` });
       } else if (action === 'hold') {
         if (!holdReason.trim()) {
@@ -594,7 +630,6 @@ export default function MechanicProcessScreen() {
         setPartItems([]);
         setHoldReason('');
         resetFinishForm();
-        setTimer(0);
 
         if (completesAfterWashing) {
           showAlert({ type: 'success', title: 'Selesai', message: 'Proses workshop selesai otomatis setelah washing bay.' });
@@ -847,17 +882,11 @@ export default function MechanicProcessScreen() {
     }
   };
 
-  const formatTime = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   const renderStepTimeline = () => (
     <Card style={styles.timelineCard}>
       <Text style={styles.timelineTitle}>Progress Station (9 Step)</Text>
       <View style={styles.stepsRow}>
+        <View style={styles.stepsLine} />
         {STATION_STEP_CODES.map((code, idx) => {
           const log = stepLogs.find((s) => s.step_code === code);
           const isDone = log?.status === 'done';
@@ -884,15 +913,6 @@ export default function MechanicProcessScreen() {
           );
         })}
       </View>
-      {(() => {
-        const currentCode = STEP_CODES[currentStepIndex];
-        const displayCode = STATION_STEP_CODES.includes(currentCode) ? currentCode : STATION_STEP_CODES[0];
-        return (
-      <Text style={styles.stepLabel}>
-        {STEP_NAME_MAP[displayCode]}
-      </Text>
-        );
-      })()}
     </Card>
   );
 
@@ -1003,7 +1023,11 @@ export default function MechanicProcessScreen() {
     const currentLog = stepLogs.find((s) => s.step_code === STEP_CODES[currentStepIndex]);
     const startAt = currentLog?.process_in_at ? new Date(currentLog.process_in_at).toLocaleString('id-ID') : '-';
     const endAt = currentLog?.process_out_at ? new Date(currentLog.process_out_at).toLocaleString('id-ID') : '-';
-    const durationMinutes = currentLog?.actual_minutes ?? (status === 'active' ? Math.floor(timer / 60) : 0);
+    const processInAt = currentLog?.process_in_at || null;
+    const fallbackElapsedSeconds = currentLog?.process_in_at
+      ? Math.floor((Date.now() - new Date(currentLog.process_in_at).getTime()) / 1000)
+      : 0;
+    const durationMinutes = currentLog?.actual_minutes ?? (fallbackElapsedSeconds > 0 ? Math.floor(fallbackElapsedSeconds / 60) : 0);
 
     if (woData?.status === 'registered') {
       return (
@@ -1058,11 +1082,17 @@ export default function MechanicProcessScreen() {
 
     return (
       <Card style={styles.widgetCard}>
+        <Text style={styles.currentStepTitle}>
+          {formatStepTitle(STEP_NAME_MAP[STEP_CODES[currentStepIndex]] || STEP_CODES[currentStepIndex])}
+        </Text>
         <View style={styles.timerHeader}>
           <Clock size={24} color={status === 'active' ? theme.colors.primary : theme.colors.textSecondary} />
-          <Text style={[styles.timerText, status === 'active' && { color: theme.colors.primary }]}>
-            {formatTime(timer)}
-          </Text>
+          <LiveTimerText
+            status={status}
+            startAt={processInAt}
+            fallbackSeconds={fallbackElapsedSeconds}
+            style={[styles.timerText, status === 'active' && { color: theme.colors.primary }]}
+          />
           <View
             style={[
               styles.statusBadge,
@@ -1075,7 +1105,12 @@ export default function MechanicProcessScreen() {
         <View style={styles.timeMeta}>
           <Text style={styles.timeMetaText}>Start: {startAt}</Text>
           <Text style={styles.timeMetaText}>End: {endAt}</Text>
-          <Text style={styles.timeMetaText}>Durasi: {durationMinutes || 0} menit</Text>
+          <LiveDurationText
+            status={status}
+            startAt={processInAt}
+            fallbackMinutes={durationMinutes}
+            style={styles.timeMetaText}
+          />
         </View>
 
         {/* Hold reason input - show when active */}
@@ -1181,7 +1216,9 @@ export default function MechanicProcessScreen() {
       <View style={styles.headerBox}>
         <Text style={styles.woCode}>{woData?.code || '-'}</Text>
         <Text style={styles.woTitle}>{woData?.title || '-'}</Text>
-        <Text style={styles.woAsset}>Unit: {woData?.asset?.name || woData?.asset?.code || '-'}</Text>
+        <Text style={styles.woAsset}>
+          Unit: {woData?.asset?.name || woData?.asset?.code || '-'}{woData?.field?.code ? ` (${woData.field.code})` : ''}
+        </Text>
         <Text style={styles.woAsset}>No Polisi: {woData?.asset?.veh_plate_no || woData?.asset?.plate_number || '-'}</Text>
       </View>
 
@@ -1260,6 +1297,7 @@ const styles = StyleSheet.create({
   },
   timelineCard: {
     margin: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
     padding: theme.spacing.md,
   },
   timelineTitle: {
@@ -1270,10 +1308,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepsRow: {
+    position: 'relative',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
+  },
+  stepsLine: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    top: 13,
+    height: 2,
+    backgroundColor: theme.colors.border,
   },
   stepDot: {
     width: 28,
@@ -1288,13 +1335,15 @@ const styles = StyleSheet.create({
   stepDotHold: { backgroundColor: theme.colors.warning },
   stepDotCurrent: { borderWidth: 2, borderColor: theme.colors.primary },
   stepNum: { fontSize: 11, fontWeight: 'bold', color: theme.colors.textSecondary },
-  stepLabel: {
-    ...theme.typography.body,
-    fontWeight: '700',
-    color: theme.colors.primary,
+  widgetCard: { margin: theme.spacing.md, marginTop: theme.spacing.xs, padding: theme.spacing.xl, alignItems: 'center' },
+  currentStepTitle: {
+    ...theme.typography.h1,
+    color: theme.colors.text,
     textAlign: 'center',
+    marginBottom: theme.spacing.md,
+    fontSize: 30,
+    lineHeight: 36,
   },
-  widgetCard: { margin: theme.spacing.md, padding: theme.spacing.xl, alignItems: 'center' },
   timerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg },
   timerText: {
     fontSize: 36,

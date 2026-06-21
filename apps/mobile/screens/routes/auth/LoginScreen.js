@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
@@ -42,6 +42,10 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
+          <View style={styles.brandRow}>
+            <Image source={require('../../../assets/images/logo-tap.png')} style={styles.brandLogoTap} resizeMode="contain" />
+            <Image source={require('../../../assets/images/logo-ywa.png')} style={styles.brandLogoYwa} resizeMode="contain" />
+          </View>
           <Text style={styles.title}>{'Halo,\nSelamat Datang\nKembali'}</Text>
           <Text style={styles.subtitle}>Hai, selamat datang kembali ke ruang kerjamu.</Text>
         </View>
@@ -95,6 +99,21 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'flex-start',
     marginBottom: theme.spacing.xxl,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: theme.spacing.lg,
+  },
+  brandLogoTap: {
+    width: 72,
+    height: 28,
+  },
+  brandLogoYwa: {
+    width: 48,
+    height: 28,
   },
   title: {
     ...theme.typography.h1,

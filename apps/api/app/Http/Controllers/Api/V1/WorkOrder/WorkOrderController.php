@@ -225,7 +225,12 @@ class WorkOrderController extends Controller
             'processAbnormalities',
         ]);
 
-        return response()->json($workOrder);
+        return response()->json([
+            ...$workOrder->toArray(),
+            'field' => [
+                'code' => $workOrder->asset?->code,
+            ],
+        ]);
     }
 
     public function update(Request $request, WorkOrder $workOrder): JsonResponse

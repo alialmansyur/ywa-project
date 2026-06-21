@@ -646,7 +646,7 @@ class WorkOrderProcessService
                 $requireArray('inspection_categories', 'Kategori pekerjaan wajib dipilih minimal 1 item.');
                 $ensureIn('inspection_result', ['NORMAL', 'ABNORMAL', 'FOLLOW_UP'], 'Hasil inspeksi tidak valid.');
                 $ensureIn('work_plan', ['LANJUT_CHECKING', 'LANJUT_REPAIR', 'MENUNGGU_APPROVAL'], 'Rencana pekerjaan tidak valid.');
-                $ensureEveryIn('inspection_categories', ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem'], 'Kategori pekerjaan tidak valid.');
+                $ensureEveryIn('inspection_categories', ['Karoseri', 'Kaki-kaki', 'Ban', 'Sistem Rem', 'Engine', 'Hydraulic', 'Electrical', 'Safety', 'Body'], 'Kategori pekerjaan tidak valid.');
                 break;
 
             case 'CHECKING':

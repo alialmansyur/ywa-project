@@ -257,6 +257,38 @@ class WorkOrderProcessFlowTest extends TestCase
         $this->assertNotEmpty($stepInEvent['started_at']);
     }
 
+    public function test_work_order_detail_exposes_field_code_from_asset_code(): void
+    {
+        $this->seed();
+
+        $user = User::where('email', 'mechanic@tapg.local')->firstOrFail();
+        $category = AssetCategory::query()->create(['name' => 'Excavator']);
+        $asset = Asset::query()->create([
+            'code' => 'FIELD-A1',
+            'name' => 'Excavator Test 004',
+            'category_id' => $category->id,
+            'status' => 'active',
+        ]);
+
+        $supervisor = User::where('email', 'supervisor@tapg.local')->firstOrFail();
+
+        $workOrder = WorkOrder::query()->create([
+            'code' => 'WO-TEST-SHOW-001',
+            'asset_id' => $asset->id,
+            'type' => 'preventive',
+            'priority' => 'medium',
+            'title' => 'Service show test',
+            'status' => 'approved',
+            'supervisor_id' => $supervisor->id,
+            'created_by' => $supervisor->id,
+        ]);
+
+        $this->actingAsApi($user)
+            ->getJson("/api/v1/work-orders/{$workOrder->id}")
+            ->assertOk()
+            ->assertJsonPath('field.code', 'FIELD-A1');
+    }
+
     private function actingAsApi(User $user): self
     {
         $token = $user->createToken('test-token')->plainTextToken;
