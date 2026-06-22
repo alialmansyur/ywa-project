@@ -289,6 +289,56 @@ class WorkOrderProcessFlowTest extends TestCase
             ->assertJsonPath('field.code', 'FIELD-A1');
     }
 
+    public function test_work_order_cancel_status_persists_cancel_reason_in_same_table(): void
+    {
+        $this->seed();
+
+        $user = User::where('email', 'supervisor@tapg.local')->firstOrFail();
+        $user->givePermissionTo('edit work-orders');
+
+        $category = AssetCategory::query()->create(['name' => 'Excavator']);
+        $asset = Asset::query()->create([
+            'code' => 'EXC-T-005',
+            'name' => 'Excavator Test 005',
+            'category_id' => $category->id,
+            'status' => 'active',
+        ]);
+
+        $workOrder = WorkOrder::query()->create([
+            'code' => 'WO-TEST-CANCEL-001',
+            'asset_id' => $asset->id,
+            'type' => 'preventive',
+            'priority' => 'medium',
+            'title' => 'Service cancel test',
+            'status' => 'approved',
+            'supervisor_id' => $user->id,
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAsApi($user)
+            ->patchJson("/api/v1/work-orders/{$workOrder->id}/status", [
+                'status' => 'cancelled',
+                'notes' => 'Unit tidak jadi masuk workshop.',
+                'cancel_reason' => 'Unit tidak jadi masuk workshop.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('work_order.status', 'cancelled')
+            ->assertJsonPath('work_order.cancel_reason', 'Unit tidak jadi masuk workshop.');
+
+        $this->assertDatabaseHas('work_orders', [
+            'id' => $workOrder->id,
+            'status' => 'cancelled',
+            'cancel_reason' => 'Unit tidak jadi masuk workshop.',
+        ]);
+
+        $this->assertDatabaseHas('work_order_status_logs', [
+            'wo_id' => $workOrder->id,
+            'from_status' => 'approved',
+            'to_status' => 'cancelled',
+            'notes' => 'Unit tidak jadi masuk workshop.',
+        ]);
+    }
+
     private function actingAsApi(User $user): self
     {
         $token = $user->createToken('test-token')->plainTextToken;

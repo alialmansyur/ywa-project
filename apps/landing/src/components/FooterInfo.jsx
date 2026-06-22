@@ -9,7 +9,7 @@ export function FooterInfo({ adminUrl, dashboardUrl, apkUrl }) {
           <div className="flex flex-wrap items-center justify-center gap-5 text-sm md:justify-start">
             <a className="footer-link" href={adminUrl} target="_blank" rel="noreferrer">Admin</a>
             <a className="footer-link" href={dashboardUrl} target="_blank" rel="noreferrer">Dashboard</a>
-            <a className="footer-link" href={apkUrl} download="application-ywa-maintenance.apk">Mobile App</a>
+            <a className="footer-link" href={apkUrl} target="_blank" rel="noreferrer">Mobile App</a>
           </div>
         </div>
         <p className="m-0 text-center text-sm text-[var(--text-faint)] md:text-right">

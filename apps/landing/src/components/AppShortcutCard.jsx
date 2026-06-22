@@ -27,7 +27,6 @@ export function AppShortcutCard({ item, index = 0 }) {
       href={item.href}
       target={isExternal ? '_blank' : undefined}
       rel={isExternal ? 'noreferrer' : undefined}
-      download={item.download}
       className="group flex h-36 w-36 flex-col items-center justify-center gap-3 rounded-[1.5rem] border border-white/40 bg-white/40 p-4 shadow-lg shadow-emerald-900/5 backdrop-blur-md transition-all duration-500 hover:-translate-y-2 hover:border-emerald-400/60 hover:bg-white/60 hover:shadow-2xl hover:shadow-emerald-600/20 dark:border-white/10 dark:bg-black/20 dark:shadow-black/50 dark:hover:border-emerald-500/40 dark:hover:bg-black/40 dark:hover:shadow-emerald-500/20 animate-fade-in-up"
       style={{ animationDelay: `${400 + index * 150}ms` }}
     >

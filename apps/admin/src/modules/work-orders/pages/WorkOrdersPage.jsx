@@ -4,7 +4,18 @@ import { apiRequest, ApiError } from '../../../services/api'
 import { mapMeResponse } from '../../../services/auth'
 import { ModalPortal } from '../../shared/components/ModalPortal'
 
-const swal = Swal.mixin({ width: 420, customClass: { popup: 'rounded-2xl' } })
+const swal = Swal.mixin({
+  width: 380,
+  buttonsStyling: false,
+  customClass: {
+    popup: 'rounded-2xl',
+    confirmButton: 'px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 focus:outline-none',
+    cancelButton: 'px-4 py-2 rounded-xl text-sm font-semibold bg-slate-500 text-white hover:bg-slate-400 focus:outline-none',
+    actions: 'gap-3',
+    inputLabel: 'text-sm font-medium text-slate-600 mb-2',
+    input: 'rounded-xl resize-none',
+  },
+})
 
 const STATUS_COLUMNS = [
   'registered',
@@ -200,6 +211,43 @@ export function WorkOrdersPage() {
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const handleCancelWorkOrder = async () => {
+    if (!selected?.id || actionLoading || ['completed', 'cancelled'].includes(detail?.status)) return
+
+    const result = await swal.fire({
+      title: 'Batalkan?',
+      text: 'Alasan pembatalan',
+      input: 'textarea',
+      inputPlaceholder: 'Tulis alasan pembatalan...',
+      inputAttributes: {
+        'aria-label': 'Alasan pembatalan',
+      },
+      inputValidator: (value) => {
+        if (!value?.trim()) return 'Alasan pembatalan wajib diisi.'
+        return undefined
+      },
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, Batalkan',
+      cancelButtonText: 'Batal',
+      reverseButtons: true,
+      padding: '1rem',
+    })
+
+    if (!result.isConfirmed) return
+
+    await runAction(
+      `/work-orders/${selected.id}/status`,
+      {
+        status: 'cancelled',
+        notes: result.value.trim(),
+        cancel_reason: result.value.trim(),
+      },
+      'Work order berhasil dibatalkan.',
+      'PATCH',
+    )
   }
 
   const timelineLabel = (item) => {
@@ -469,6 +517,12 @@ export function WorkOrdersPage() {
                 <div className="lg:col-span-2 space-y-4">
                   <div className="card p-4">
                     <div className="text-sm font-semibold mb-3">Process Snapshot</div>
+                    {detail?.cancel_reason ? (
+                      <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                        <div className="font-semibold mb-1">Alasan Pembatalan</div>
+                        <div>{detail.cancel_reason}</div>
+                      </div>
+                    ) : null}
                     <div className="space-y-2">
                       {steps.map((s) => (
                         <div key={s.id} className={`rounded-lg border p-3 text-xs ${String(s.step_order) === String(currentStepOrder) ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700'}`}>
@@ -501,16 +555,8 @@ export function WorkOrdersPage() {
 
                         <div className="md:col-span-2 overflow-x-auto hide-scrollbar">
                           <div className="flex items-center gap-2 min-w-max">
-                            {canDo('start_process', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading} onClick={() => runAction(`/work-orders/${selected.id}/process/start`, null, 'Process WO dimulai.')} className="btn-primary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Start Process</button>}
-                            {detail?.status === 'draft' && <button disabled={actionLoading} onClick={() => runAction(`/work-orders/${selected.id}/status`, { status: 'pending', notes: note || 'Diajukan untuk approval' }, 'WO diajukan ke pending.', 'PATCH')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Ajukan Approval</button>}
-                            {canApprove && detail?.status === 'pending' && <button disabled={actionLoading} onClick={() => runAction(`/work-orders/${selected.id}/approve`, null, 'WO disetujui.')} className="btn-primary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Approve WO</button>}
-                            {canDo('step_in', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/in`, { notes: note || null }, 'Step dimulai.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Step In</button>}
-                            {canDo('step_out', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/out`, { notes: note || null, sap_reference_no: isCreateWoStep ? sapReferenceNo.trim() : undefined }, 'Step selesai.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Step Out</button>}
-                            {canDo('step_hold', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/hold`, { reason: note || 'Hold sementara' }, 'Step di-hold.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Hold</button>}
-                            {canDo('step_resume', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/resume`, { notes: note || null }, 'Step dilanjutkan.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Resume</button>}
+                            <button disabled={actionLoading} onClick={handleCancelWorkOrder} className="px-3 py-2 rounded-lg text-sm whitespace-nowrap bg-red-500/15 text-red-300 border border-red-500/30 disabled:opacity-60">Cancel WO</button>
                             {canDo('step_complete', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading} onClick={() => runAction(`/work-orders/${selected.id}/process/complete`, { notes: note || null }, 'Process WO selesai.')} className="btn-primary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Complete</button>}
-                            {canDo('step_approve', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/approve`, { notes: note || null }, 'Step disetujui.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Approve Step</button>}
-                            {canDo('step_reject', activeStatus, { canExecute, canApprove }) && <button disabled={actionLoading || !currentStepOrder} onClick={() => runAction(`/work-orders/${selected.id}/process/steps/${currentStepOrder}/reject`, { reason: note || 'Perlu revisi' }, 'Step direject.')} className="btn-secondary px-3 py-2 rounded-lg text-sm whitespace-nowrap">Reject Step</button>}
                           </div>
                         </div>
                       </div>

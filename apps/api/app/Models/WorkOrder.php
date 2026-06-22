@@ -16,7 +16,7 @@ class WorkOrder extends Model
         'code', 'sap_reference_no', 'wo_source', 'jobcard_no', 'jobcard_status', 'jobcard_generated_at', 'jobcard_printed_at', 'jobcard_acknowledged_at', 'asset_id', 'schedule_id', 'type', 'priority', 'title', 'description',
         'status', 'process_template_id', 'is_process_tracking_enabled', 'supervisor_id', 'created_by', 'approved_by',
         'scheduled_start', 'scheduled_end', 'actual_start', 'actual_end',
-        'approved_at', 'estimated_cost', 'actual_cost', 'completion_notes',
+        'approved_at', 'estimated_cost', 'actual_cost', 'completion_notes', 'cancel_reason',
     ];
 
     protected function casts(): array
@@ -38,7 +38,7 @@ class WorkOrder extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnly(['status', 'approved_by', 'actual_cost']);
+        return LogOptions::defaults()->logOnly(['status', 'approved_by', 'actual_cost', 'cancel_reason']);
     }
 
     public function asset()

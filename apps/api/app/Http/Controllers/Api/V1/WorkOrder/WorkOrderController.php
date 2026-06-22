@@ -260,6 +260,7 @@ class WorkOrderController extends Controller
         $validated = $request->validate([
             'status' => 'required|in:draft,pending,approved,in_progress,on_hold,completed,cancelled',
             'notes' => 'nullable|string',
+            'cancel_reason' => 'nullable|string',
         ]);
 
         $oldStatus = $workOrder->status;
@@ -274,6 +275,10 @@ class WorkOrderController extends Controller
                 $updates['actual_cost'] = $request->actual_cost;
             }
         }
+        if ($validated['status'] === 'cancelled') {
+            $updates['actual_end'] = $workOrder->actual_end ?: now();
+            $updates['cancel_reason'] = $validated['cancel_reason'] ?? $validated['notes'] ?? null;
+        }
 
         $workOrder->update($updates);
 
@@ -282,7 +287,9 @@ class WorkOrderController extends Controller
             'from_status' => $oldStatus,
             'to_status' => $validated['status'],
             'changed_by' => $request->user()->id,
-            'notes' => $validated['notes'] ?? null,
+            'notes' => $validated['status'] === 'cancelled'
+                ? ($validated['cancel_reason'] ?? $validated['notes'] ?? null)
+                : ($validated['notes'] ?? null),
             'changed_at' => now(),
         ]);
 
