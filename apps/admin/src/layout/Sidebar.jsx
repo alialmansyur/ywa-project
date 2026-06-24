@@ -134,7 +134,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onClo
               </div>
             )}
           </div>
-          {!collapsed && <div><div className="font-bold text-sm">YWA</div><div className="text-xs text-slate-400">YWA Maintenance</div></div>}
+          {!collapsed && <div><div className="font-bold text-sm">Workshop</div><div className="text-xs text-slate-400">Admin Panel</div></div>}
         </div>
       </div>
 

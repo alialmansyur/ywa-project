@@ -108,7 +108,7 @@ export function LoginCard() {
       <div className="login-page__glow login-page__glow--right" aria-hidden="true" />
       <section className="login-shell" aria-label="Form login dashboard">
         <div className="login-card__heading">
-          <div className="login-brand" aria-label="Brand TPA dan YWA">
+          <div className="login-brand" aria-label="Brand TPA dan YWA" style={{ display: 'none' }}>
             <img src="/logo-tap.png" alt="Logo TPA" className="login-brand__tap" />
             <img src="/logo-ywa.png" alt="Logo YWA" className="login-brand__ywa" />
           </div>

@@ -104,7 +104,7 @@ export function LoginPage() {
                 maxWidth: '24rem',
               }}
             >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'none', alignItems: 'center', gap: '0.85rem', marginBottom: '1.5rem' }}>
               <div style={{ height: '32px', display: 'flex', alignItems: 'center' }}>
                 <img src="/logo-tap.png" alt="Logo TAP" style={{ height: '32px', width: 'auto', objectFit: 'contain', display: 'block' }} />
               </div>

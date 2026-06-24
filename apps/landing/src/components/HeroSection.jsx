@@ -3,7 +3,7 @@ export function HeroSection({ appTitle }) {
     <section id="hero" className="relative mx-auto flex min-h-[82svh] w-full max-w-6xl items-center justify-center py-20 text-center sm:py-24">
       <div className="relative w-full max-w-4xl">
         <div className="relative z-10">
-          <div className="mb-8 flex items-center justify-center gap-4 sm:gap-6">
+          <div className="mb-8 hidden items-center justify-center gap-4 sm:gap-6">
             <img src="/logo-tap.png" alt="Logo TAP" className="h-8 w-auto object-contain sm:h-10 dark:hidden" />
             <img src="/logo-tap-dark.png" alt="Logo TAP" className="hidden h-8 w-auto object-contain sm:h-10 dark:block" />
             <div className="h-8 w-px bg-[var(--line-soft)] sm:h-10" />

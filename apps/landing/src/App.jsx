@@ -32,7 +32,7 @@ function getInitialTheme() {
 
 export function App() {
   const [theme, setTheme] = useState(getInitialTheme)
-  const appTitle = 'YWA Landing Page'
+  const appTitle = 'Landing Page'
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme

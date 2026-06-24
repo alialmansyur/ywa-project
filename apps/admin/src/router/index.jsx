@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { AdminLayout } from '../layout/AdminLayout'
 import { LoginPage } from '../modules/auth/pages/LoginPage'
@@ -61,7 +61,48 @@ function hasRouteAccess(pathname, allowedRoutes) {
   })
 }
 
+const PROTECTED_ROUTE_PATHS = [
+  '/dashboard',
+  '/assets',
+  '/p2h',
+  '/work-orders',
+  '/workshop-control-tower',
+  '/schedule',
+  '/inventory',
+  '/reports/p2h',
+  '/reports/wo',
+  '/reports/breakdown',
+  '/reports/cost',
+  '/reports/utilization',
+  '/reports/mechanic',
+  '/reports/wo-history',
+  '/reports/workshop-step-control',
+  '/reports/service-history',
+  '/reports/downtime-analysis',
+  '/monitoring',
+  '/users',
+  '/settings/role-manager',
+  '/settings/smtp',
+  '/settings/system',
+  '/settings/notification-test',
+  '/settings/master-data',
+  '/settings/database-backup',
+  '/settings/dashboard-access-token',
+  '/settings/dashboard-settings',
+  '/approvals/inbox',
+  '/approvals/requests',
+  '/settings/approval-matrix',
+  '/settings/email-templates',
+  '/findings',
+  '/breakdown-reports',
+]
+
+function resolveFirstAccessibleRoute(allowedRoutes) {
+  return PROTECTED_ROUTE_PATHS.find((route) => hasRouteAccess(route, allowedRoutes)) || null
+}
+
 function ProtectedByMenu({ authenticated, routePath, children }) {
+  const location = useLocation()
   const [allowedRoutes, setAllowedRoutes] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -112,7 +153,25 @@ function ProtectedByMenu({ authenticated, routePath, children }) {
     )
   }
 
-  return hasRouteAccess(routePath, allowedRoutes) ? children : <Navigate to="/dashboard" replace />
+  if (hasRouteAccess(routePath, allowedRoutes)) {
+    return children
+  }
+
+  const fallbackRoute = resolveFirstAccessibleRoute(allowedRoutes)
+  if (fallbackRoute && normalizeRoute(location.pathname) !== normalizeRoute(fallbackRoute)) {
+    return <Navigate to={fallbackRoute} replace />
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 p-6 text-center shadow-2xl shadow-slate-950/40">
+        <h1 className="text-lg font-semibold">Akses menu belum tersedia</h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Akun ini berhasil login, tetapi belum memiliki route admin yang bisa dibuka. Silakan cek pengaturan role atau permission user.
+        </p>
+      </div>
+    </div>
+  )
 }
 
 export function AppRouter() {

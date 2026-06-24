@@ -19,7 +19,7 @@ export function Navbar({ appTitle, theme, onToggle, adminUrl, dashboardUrl }) {
           <img src="/logo-app.png" alt="Logo App" className="h-11 w-11 shrink-0 object-contain" />
           <div className="min-w-0">
             <p className="m-0 truncate font-display text-base font-bold tracking-tight text-[var(--text-main)] sm:text-lg">{appTitle}</p>
-            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] sm:text-xs">Maintenance Portal</p>
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] sm:text-xs">Workshop Portal</p>
           </div>
         </div>
 
