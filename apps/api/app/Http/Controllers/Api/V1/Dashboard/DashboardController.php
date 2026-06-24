@@ -31,6 +31,11 @@ class DashboardController extends Controller
         return response()->json($this->service->workshopOperationalSummary());
     }
 
+    public function workshopKpiDetails(): JsonResponse
+    {
+        return response()->json($this->service->workshopKpiDetails());
+    }
+
     public function p2hComplianceTrend(Request $request): JsonResponse
     {
         return response()->json($this->service->p2hComplianceTrend($request));

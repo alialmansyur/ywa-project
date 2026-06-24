@@ -8,6 +8,79 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    private function currentWorkshopQueueBase()
+    {
+        $latestInstanceSub = DB::table('wo_process_instances')
+            ->selectRaw('MAX(id) as id')
+            ->whereIn('state', ['running', 'hold', 'not_started'])
+            ->groupBy('wo_id');
+
+        return DB::table('wo_process_instances as wpi')
+            ->joinSub($latestInstanceSub, 'latest', fn ($join) => $join->on('latest.id', '=', 'wpi.id'))
+            ->join('work_orders as wo', 'wo.id', '=', 'wpi.wo_id')
+            ->leftJoin('assets as a', 'a.id', '=', 'wo.asset_id')
+            ->leftJoin('wo_process_step_logs as s', function ($join) {
+                $join->on('s.process_instance_id', '=', 'wpi.id')
+                    ->on('s.step_order', '=', 'wpi.current_step_order');
+            })
+            ->select([
+                'wo.id as wo_id',
+                'wo.code as wo_code',
+                'wo.status as wo_status',
+                'wo.type as wo_type',
+                'wo.title as wo_title',
+                'wo.created_at as wo_created_at',
+                'wo.updated_at as wo_updated_at',
+                'a.code as asset_code',
+                'a.name as asset_name',
+                DB::raw('COALESCE(a.veh_plate_no, a.plate_number) as license_plate'),
+                'wpi.current_step_order',
+                's.step_code',
+                's.step_name',
+                's.status as step_status',
+                's.est_minutes',
+                's.actual_minutes',
+                's.downtime_minutes',
+                DB::raw("COALESCE(s.bay_in,
+                    CASE
+                        WHEN s.step_code = 'BAY_WASHING' THEN 'washing_bay'
+                        WHEN s.step_code = 'BAY_WAITING' THEN 'waiting_bay'
+                        WHEN s.step_code IN ('PLANNER_CHECK','KRANI_WO_JOBCARD','ASST_VERIFY_JOBCARD','KOORD_ALLOCATE_MECHANIC') THEN 'waiting_bay'
+                        WHEN s.step_code IN ('UNIT_CHECK_PART_NEED','PART_SUPPLY','SERVICE_REPAIR','RECEIVE_JOB','INSPECTION','EXECUTION','PLAN_REPAIR','REPAIR','ACTION') THEN 'service_bay'
+                        WHEN s.step_code IN ('QC_CHECK','QC','VALIDATION','APPROVAL') THEN 'qc_bay'
+                        WHEN s.step_code IN ('CLOSE','CLOSE_WO') THEN 'ready_bay'
+                        ELSE 'waiting_bay'
+                    END
+                ) as current_bay"),
+                DB::raw('COALESCE(s.queue_minutes, TIMESTAMPDIFF(MINUTE, COALESCE(s.bay_in_at, s.created_at, wo.created_at), NOW())) as queue_minutes_live'),
+            ])
+            ->whereNull('wo.deleted_at')
+            ->whereIn('wo.status', ['registered', 'triage', 'draft', 'pending', 'approved', 'in_progress', 'on_hold']);
+    }
+
+    private function mapScheduleSeverity(string $status, ?string $nextDueAt): string
+    {
+        if ($status === 'completed') {
+            return 'success';
+        }
+
+        if (!$nextDueAt) {
+            return 'info';
+        }
+
+        $daysLeft = (int) floor(now()->diffInDays(Carbon::parse($nextDueAt), false));
+
+        if ($daysLeft <= 0) {
+            return 'danger';
+        }
+
+        if ($daysLeft <= 2) {
+            return 'warning';
+        }
+
+        return 'info';
+    }
+
     private function resolvePeriod(Request $request): array
     {
         $period = (string) $request->input('period', 'this_month');
@@ -129,6 +202,170 @@ class DashboardService
             'downtime_today_minutes' => $downtimeTodayMinutes,
             'generated_at' => now()->toISOString(),
             'timezone' => now()->getTimezone()->getName(),
+        ];
+    }
+
+    public function workshopKpiDetails(): array
+    {
+        $today = now()->toDateString();
+        $startToday = now()->copy()->startOfDay();
+        $activeStatuses = ['registered', 'triage', 'draft', 'pending', 'approved', 'in_progress', 'on_hold'];
+
+        $activeWorkOrders = $this->currentWorkshopQueueBase()
+            ->orderByDesc('queue_minutes_live')
+            ->orderByDesc('wo_created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($row) => [
+                'wo_id' => (int) $row->wo_id,
+                'wo_code' => $row->wo_code,
+                'wo_status' => $row->wo_status,
+                'wo_type' => $row->wo_type,
+                'asset_code' => $row->asset_code,
+                'asset_name' => $row->asset_name,
+                'license_plate' => $row->license_plate,
+                'step_name' => $row->step_name,
+                'current_bay' => $row->current_bay,
+                'queue_minutes_live' => (int) ($row->queue_minutes_live ?? 0),
+                'est_minutes' => (int) ($row->est_minutes ?? 0),
+                'updated_at' => $row->wo_updated_at,
+            ])
+            ->values();
+
+        $lateSteps = DB::table('wo_process_step_logs as s')
+            ->join('work_orders as wo', 'wo.id', '=', 's.wo_id')
+            ->leftJoin('assets as a', 'a.id', '=', 'wo.asset_id')
+            ->whereNull('wo.deleted_at')
+            ->whereDate('s.updated_at', $today)
+            ->whereNotNull('s.est_minutes')
+            ->whereNotNull('s.actual_minutes')
+            ->whereColumn('s.actual_minutes', '>', 's.est_minutes')
+            ->orderByDesc(DB::raw('COALESCE(s.actual_minutes, 0) - COALESCE(s.est_minutes, 0)'))
+            ->orderByDesc('s.updated_at')
+            ->limit(100)
+            ->get([
+                'wo.id as wo_id',
+                'wo.code as wo_code',
+                'wo.status as wo_status',
+                'a.code as asset_code',
+                'a.name as asset_name',
+                's.step_name',
+                's.est_minutes',
+                's.actual_minutes',
+                's.downtime_minutes',
+                's.updated_at',
+            ])
+            ->map(fn ($row) => [
+                'wo_id' => (int) $row->wo_id,
+                'wo_code' => $row->wo_code,
+                'wo_status' => $row->wo_status,
+                'asset_code' => $row->asset_code,
+                'asset_name' => $row->asset_name,
+                'step_name' => $row->step_name,
+                'est_minutes' => (int) ($row->est_minutes ?? 0),
+                'actual_minutes' => (int) ($row->actual_minutes ?? 0),
+                'downtime_minutes' => (int) ($row->downtime_minutes ?? 0),
+                'gap_minutes' => max(0, (int) ($row->actual_minutes ?? 0) - (int) ($row->est_minutes ?? 0)),
+                'updated_at' => $row->updated_at,
+            ])
+            ->values();
+
+        $onHoldWorkOrders = $this->currentWorkshopQueueBase()
+            ->where('wo.status', 'on_hold')
+            ->orderByDesc('queue_minutes_live')
+            ->orderByDesc('wo_updated_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($row) => [
+                'wo_id' => (int) $row->wo_id,
+                'wo_code' => $row->wo_code,
+                'asset_code' => $row->asset_code,
+                'asset_name' => $row->asset_name,
+                'license_plate' => $row->license_plate,
+                'step_name' => $row->step_name,
+                'current_bay' => $row->current_bay,
+                'queue_minutes_live' => (int) ($row->queue_minutes_live ?? 0),
+                'updated_at' => $row->wo_updated_at,
+            ])
+            ->values();
+
+        $completedToday = DB::table('work_orders as wo')
+            ->leftJoin('assets as a', 'a.id', '=', 'wo.asset_id')
+            ->whereNull('wo.deleted_at')
+            ->where('wo.status', 'completed')
+            ->whereDate(DB::raw('COALESCE(wo.actual_end, wo.updated_at)'), $today)
+            ->orderByDesc(DB::raw('COALESCE(wo.actual_end, wo.updated_at)'))
+            ->limit(100)
+            ->get([
+                'wo.id as wo_id',
+                'wo.code as wo_code',
+                'wo.type as wo_type',
+                'wo.title as wo_title',
+                'wo.actual_end',
+                'wo.updated_at',
+                'a.code as asset_code',
+                'a.name as asset_name',
+            ])
+            ->map(fn ($row) => [
+                'wo_id' => (int) $row->wo_id,
+                'wo_code' => $row->wo_code,
+                'wo_type' => $row->wo_type,
+                'wo_title' => $row->wo_title,
+                'asset_code' => $row->asset_code,
+                'asset_name' => $row->asset_name,
+                'completed_at' => $row->actual_end ?: $row->updated_at,
+            ])
+            ->values();
+
+        $scheduleDueToday = DB::table('maintenance_schedules as ms')
+            ->leftJoin('assets as a', 'a.id', '=', 'ms.asset_id')
+            ->leftJoin('work_orders as wo', function ($join) use ($activeStatuses) {
+                $join->on('wo.schedule_id', '=', 'ms.id')
+                    ->whereNull('wo.deleted_at')
+                    ->whereIn('wo.status', $activeStatuses);
+            })
+            ->where('ms.status', '!=', 'completed')
+            ->whereDate('ms.next_due_at', $today)
+            ->groupBy('ms.id', 'ms.name', 'ms.type', 'ms.status', 'ms.next_due_at', 'a.code', 'a.name')
+            ->orderBy('ms.next_due_at')
+            ->limit(100)
+            ->get([
+                'ms.id',
+                'ms.name',
+                'ms.type',
+                'ms.status',
+                'ms.next_due_at',
+                'a.code as asset_code',
+                'a.name as asset_name',
+                DB::raw('MAX(wo.code) as active_wo_code'),
+            ])
+            ->map(function ($row) {
+                $status = (string) ($row->status ?: 'scheduled');
+
+                return [
+                    'schedule_id' => (int) $row->id,
+                    'name' => $row->name,
+                    'type' => $row->type,
+                    'status' => $status,
+                    'severity' => $this->mapScheduleSeverity($status, $row->next_due_at),
+                    'next_due_at' => $row->next_due_at,
+                    'asset_code' => $row->asset_code,
+                    'asset_name' => $row->asset_name,
+                    'active_wo_code' => $row->active_wo_code,
+                ];
+            })
+            ->values();
+
+        return [
+            'generated_at' => now()->toISOString(),
+            'timezone' => now()->getTimezone()->getName(),
+            'kpis' => [
+                'active_wo' => $activeWorkOrders,
+                'late_steps' => $lateSteps,
+                'on_hold' => $onHoldWorkOrders,
+                'completed_today' => $completedToday,
+                'schedule_due_today' => $scheduleDueToday,
+            ],
         ];
     }
 

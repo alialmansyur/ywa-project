@@ -256,6 +256,7 @@ Route::prefix('v1')->group(function () {
             Route::get('overview', [DashboardController::class, 'overview'])->name('overview');
             Route::get('workshop-operational-summary', [DashboardController::class, 'workshopOperationalSummary'])->name('workshop-operational-summary');
             Route::get('work-order-status', [DashboardController::class, 'workOrderStatus'])->name('work-order-status');
+            Route::get('workshop-kpi-details', [DashboardController::class, 'workshopKpiDetails'])->name('workshop-kpi-details');
             Route::get('p2h-compliance-trend', [DashboardController::class, 'p2hComplianceTrend'])->name('p2h-compliance-trend');
             Route::get('upcoming-schedules', [DashboardController::class, 'upcomingSchedules'])->name('upcoming-schedules');
             Route::get('asset-status', [DashboardController::class, 'assetStatus'])->name('asset-status');

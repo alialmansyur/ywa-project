@@ -11,6 +11,7 @@ import { SlideThreeSchedule } from './slides/SlideThreeSchedule'
 import { SlideFourAnalyst } from './slides/SlideFourAnalyst'
 import { SettingsModal } from './SettingsModal'
 import { WoDetailModal } from './WoDetailModal'
+import { KpiDetailModal } from './KpiDetailModal'
 import { BlockingLoader } from './BlockingLoader'
 import { DashboardSkeleton } from './DashboardSkeleton'
 import { driver } from 'driver.js';
@@ -41,6 +42,7 @@ export function DashboardContent({ me }) {
   const [towerBay, setTowerBay] = useState('all')
   const [towerType, setTowerType] = useState('all')
   const [towerStatus, setTowerStatus] = useState('all')
+  const [selectedKpiKey, setSelectedKpiKey] = useState(null)
   const [selectedWoId, setSelectedWoId] = useState(null)
   const [isManualReloading, setIsManualReloading] = useState(false)
   const [notifiedQueueIds, setNotifiedQueueIds] = useState(() => {
@@ -75,11 +77,11 @@ export function DashboardContent({ me }) {
   }, [])
 
   useEffect(() => {
-    if (!selectedWoId) return
+    if (!selectedWoId && !selectedKpiKey) return
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prevOverflow }
-  }, [selectedWoId])
+  }, [selectedKpiKey, selectedWoId])
 
   useEffect(() => {
     document.documentElement.classList.add('dashboard-display-root')
@@ -201,6 +203,13 @@ export function DashboardContent({ me }) {
       ])
       return { detail, process, timeline: Array.isArray(timeline) ? timeline : [], metrics }
     },
+  })
+
+  const kpiDetailQuery = useQuery({
+    queryKey: ['dashboard-kpi-details'],
+    enabled: Boolean(selectedKpiKey),
+    queryFn: async () => getJson('/dashboard/workshop-kpi-details'),
+    refetchInterval: selectedKpiKey ? 30000 : false,
   })
 
   const towerRows = useMemo(() => (towerQuery.data?.workOrders?.data || []).filter((row) => isActiveWorkshopRow(row)), [towerQuery.data])
@@ -516,13 +525,6 @@ export function DashboardContent({ me }) {
     window.location.href = '/login'
   }
 
-  const handleKpiDrilldown = (kind) => {
-    if (kind === 'hold') setTowerStatus('on_hold')
-    else if (kind === 'late') setTowerStatus('approved')
-    else if (kind === 'active') setTowerStatus('all')
-    setActiveSlide(1)
-  }
-
   const saveSettings = async () => {
     const payload = {
       ...settingsDraft,
@@ -573,8 +575,10 @@ export function DashboardContent({ me }) {
     towerQuery.isLoading,
   ])
 
+  const isAnyModalOpen = Boolean(selectedWoId || selectedKpiKey)
+
   return (
-    <div className="dashboard-shell dashboard-with-sidebar">
+    <div className={isAnyModalOpen ? 'dashboard-shell dashboard-with-sidebar dashboard-modal-open' : 'dashboard-shell dashboard-with-sidebar'}>
       <AppSidebar onStartTour={startTour} theme={theme} setTheme={setTheme} isFullscreen={isFullscreen} toggleFullscreen={toggleFullscreen} handleManualReload={handleManualReload} isReloading={towerQuery.isFetching || (isScheduleSlideEnabled && (scheduleListQuery.isFetching || scheduleUpcomingQuery.isFetching || scheduleCalendarQuery.isFetching)) || (isAnalystSlideEnabled && analystQuery.isFetching)} openSettings={() => { setSettingsDraft(settings); setSettingsTab('general'); setShowSettings(true) }} handleLogout={handleLogout} showKpi={showKpi} setShowKpi={setShowKpi} />
       <div className={showKpi ? "dashboard-main" : "dashboard-main dashboard-main-kpi-hidden"}>
         {isInitialDashboardLoading ? <DashboardSkeleton showKpi={showKpi} /> : (
@@ -583,11 +587,11 @@ export function DashboardContent({ me }) {
             <AppTopbar settings={settings} now={now} lastUpdateAt={Math.max(Number(towerQuery.dataUpdatedAt || 0), Number(summaryQuery.dataUpdatedAt || 0), Number(woDetailQuery.dataUpdatedAt || 0))} connectionStatus={connectionStatus} latencyMs={latencyMs} />
             {showKpi && (
               <section className="kpi-grid">
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Active WO</p><h3>{activeCount}</h3><small className={activeCount - kpiPrev.active >= 0 ? 'positive' : 'negative'}>{activeCount - kpiPrev.active >= 0 ? '+' : ''}{activeCount - kpiPrev.active}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="late" /></span><div className="kpi-meta"><p>Late Steps</p><h3>{lateCount}</h3><small className={lateCount - kpiPrev.late > 0 ? 'negative' : 'positive'}>{lateCount - kpiPrev.late >= 0 ? '+' : ''}{lateCount - kpiPrev.late}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="hold" /></span><div className="kpi-meta"><p>On Hold</p><h3>{holdCount}</h3><small className={holdCount - kpiPrev.hold > 0 ? 'negative' : 'positive'}>{holdCount - kpiPrev.hold >= 0 ? '+' : ''}{holdCount - kpiPrev.hold}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Completed WO (Today)</p><h3>{completedCount}</h3><small className={completedCount - kpiPrev.completed >= 0 ? 'positive' : 'negative'}>{completedCount - kpiPrev.completed >= 0 ? '+' : ''}{completedCount - kpiPrev.completed}</small></div></div></article>
-                <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Schedule Due<br />Hari Ini</p><h3>{dueTodayCount}</h3><small>{dueTodayCount}</small></div></div></article>
+                <button type="button" className="kpi-card" onClick={() => setSelectedKpiKey('active_wo')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Active WO</p><h3>{activeCount}</h3><small className={activeCount - kpiPrev.active >= 0 ? 'positive' : 'negative'}>{activeCount - kpiPrev.active >= 0 ? '+' : ''}{activeCount - kpiPrev.active}</small></div></div></button>
+                <button type="button" className="kpi-card" onClick={() => setSelectedKpiKey('late_steps')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="late" /></span><div className="kpi-meta"><p>Late Steps</p><h3>{lateCount}</h3><small className={lateCount - kpiPrev.late > 0 ? 'negative' : 'positive'}>{lateCount - kpiPrev.late >= 0 ? '+' : ''}{lateCount - kpiPrev.late}</small></div></div></button>
+                <button type="button" className="kpi-card" onClick={() => setSelectedKpiKey('on_hold')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="hold" /></span><div className="kpi-meta"><p>On Hold</p><h3>{holdCount}</h3><small className={holdCount - kpiPrev.hold > 0 ? 'negative' : 'positive'}>{holdCount - kpiPrev.hold >= 0 ? '+' : ''}{holdCount - kpiPrev.hold}</small></div></div></button>
+                <button type="button" className="kpi-card" onClick={() => setSelectedKpiKey('completed_today')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="queue" /></span><div className="kpi-meta"><p>Completed WO (Today)</p><h3>{completedCount}</h3><small className={completedCount - kpiPrev.completed >= 0 ? 'positive' : 'negative'}>{completedCount - kpiPrev.completed >= 0 ? '+' : ''}{completedCount - kpiPrev.completed}</small></div></div></button>
+                <button type="button" className="kpi-card" onClick={() => setSelectedKpiKey('schedule_due_today')}><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Schedule Due<br />Hari Ini</p><h3>{dueTodayCount}</h3><small>{dueTodayCount}</small></div></div></button>
                 <article className="kpi-card"><div className="kpi-head"><span className="kpi-icon"><KpiIcon kind="down" /></span><div className="kpi-meta"><p>Downtime</p><h3>{downtimeTodayMinutes} m</h3><small className={downtimeTodayMinutes - kpiPrev.downtime > 0 ? 'negative' : 'positive'}>{downtimeTodayMinutes - kpiPrev.downtime >= 0 ? '+' : ''}{downtimeTodayMinutes - kpiPrev.downtime}</small></div></div></article>
               </section>
             )}
@@ -637,6 +641,7 @@ export function DashboardContent({ me }) {
         )}
       </div>
       <SettingsModal show={showSettings} setShow={setShowSettings} settingsTab={settingsTab} setSettingsTab={setSettingsTab} settingsDraft={settingsDraft} setSettingsDraft={setSettingsDraft} saveSettings={saveSettings} saving={isSavingSettings} lockOpen={showSettings} />
+      <KpiDetailModal selectedKpiKey={selectedKpiKey} setSelectedKpiKey={setSelectedKpiKey} kpiDetailQuery={kpiDetailQuery} />
       <WoDetailModal selectedWoId={selectedWoId} setSelectedWoId={setSelectedWoId} woDetailQuery={woDetailQuery} />
       {isManualReloading ? <BlockingLoader text="Memuat data terbaru..." /> : null}
     </div>

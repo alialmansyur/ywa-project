@@ -227,6 +227,11 @@ body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); 
   padding: 0.75rem;
   background: var(--panel);
   border: 1px solid var(--border);
+  text-align: left;
+  width: 100%;
+  appearance: none;
+  color: inherit;
+  font: inherit;
 }
 .kpi-clickable { cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
 .kpi-clickable:hover { background: var(--hover); }
@@ -1654,14 +1659,22 @@ html.theme-light .cal-cell {
     position: fixed;
     inset: 0;
     z-index: 120;
-    background: rgba(2, 6, 23, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(2, 6, 23, 0.48);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     display: grid;
   place-items: center;
   padding: 1rem;
   animation: fadeIn 180ms ease-out;
   overflow: hidden;
+}
+
+.dashboard-modal-open .app-sidebar,
+.dashboard-modal-open .dashboard-main {
+  filter: blur(8px);
+  transition: filter 180ms ease;
+  pointer-events: none;
+  user-select: none;
 }
 
 .wo-modal {
@@ -1731,6 +1744,21 @@ html.theme-light .cal-cell {
 }
 
 .wo-modal-body { } /* Removed hidden scrollbar */
+
+.kpi-detail-modal {
+  width: min(1080px, 100%);
+}
+
+.kpi-detail-body {
+  grid-template-columns: 1fr;
+}
+
+.kpi-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.65rem;
+}
 
 .wo-modal-body h4 {
   margin: 0 0 0.45rem;
