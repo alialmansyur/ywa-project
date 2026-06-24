@@ -1930,6 +1930,103 @@ html.theme-light .cal-cell {
   font-size: var(--dash-fs-subtitle);
 }
 
+html.theme-light .wo-modal {
+  border-color: rgba(148, 163, 184, 0.26);
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbf9 100%);
+  color: #0f172a;
+}
+
+html.theme-light .wo-modal-head {
+  border-bottom-color: rgba(148, 163, 184, 0.24);
+}
+
+html.theme-light .wo-modal-code {
+  color: #0f766e;
+}
+
+html.theme-light .wo-modal-sap {
+  color: #047857;
+}
+
+html.theme-light .wo-modal-head h3,
+html.theme-light .wo-overview-item strong,
+html.theme-light .wo-step-head strong,
+html.theme-light .wo-timeline-title,
+html.theme-light .wo-metrics,
+html.theme-light .kpi-detail-modal table,
+html.theme-light .kpi-detail-modal th,
+html.theme-light .kpi-detail-modal td {
+  color: #0f172a;
+}
+
+html.theme-light .wo-modal-asset,
+html.theme-light .wo-overview-item span,
+html.theme-light .wo-step-meta,
+html.theme-light .wo-timeline-time,
+html.theme-light .wo-empty {
+  color: #64748b;
+}
+
+html.theme-light .wo-modal-close {
+  border-color: rgba(148, 163, 184, 0.3);
+  background: #ffffff;
+  color: #334155;
+}
+
+html.theme-light .wo-overview-item,
+html.theme-light .wo-step-item {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+html.theme-light .wo-step-progress-track {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+html.theme-light .wo-step-status {
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+html.theme-light .wo-step-status-done {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.24);
+  color: #166534;
+}
+
+html.theme-light .wo-step-status-ready {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #334155;
+}
+
+html.theme-light .wo-step-status-in-progress {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.24);
+  color: #92400e;
+}
+
+html.theme-light .wo-step-status-hold {
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(249, 115, 22, 0.24);
+  color: #9a3412;
+}
+
+html.theme-light .wo-step-status-rejected {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.24);
+  color: #b91c1c;
+}
+
+html.theme-light .wo-step-status-neutral {
+  background: rgba(100, 116, 139, 0.1);
+  border-color: rgba(100, 116, 139, 0.2);
+  color: #475569;
+}
+
+html.theme-light .wo-timeline-item {
+  border-left-color: rgba(148, 163, 184, 0.32);
+}
+
 .wo-modal-code,
 .wo-modal-sap,
 .wo-modal-asset,
