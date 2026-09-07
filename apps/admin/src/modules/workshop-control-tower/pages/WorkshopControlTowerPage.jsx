@@ -1,4 +1,6 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import AsyncSelect from 'react-select/async'
+import Swal from 'sweetalert2'
 import { apiRequest, ApiError } from '../../../services/api'
 import { ModalPortal } from '../../shared/components/ModalPortal'
 
@@ -59,6 +61,95 @@ export function WorkshopControlTowerPage() {
   const [woTimeline, setWoTimeline] = useState([])
   const [woMetrics, setWoMetrics] = useState(null)
   const [completedCount, setCompletedCount] = useState(0)
+
+  const [showRegModal, setShowRegModal] = useState(false)
+  const [regForm, setRegForm] = useState({ asset: null, title: '', description: '' })
+  const [regSubmitting, setRegSubmitting] = useState(false)
+
+  const loadAssets = async (inputValue) => {
+    try {
+      const res = await apiRequest(`/assets?q=${encodeURIComponent(inputValue)}&per_page=20`)
+      const items = res?.data || []
+      return items.map(a => ({
+        label: `${a.code} - ${a.name} ${a.io_code ? `(${a.io_code})` : ''}`,
+        value: a.id,
+        asset: a,
+      }))
+    } catch (e) {
+      return []
+    }
+  }
+
+  const handleRegisterArrival = async (e) => {
+    e.preventDefault()
+    if (!regForm.asset) return
+    setRegSubmitting(true)
+    try {
+      const asset = regForm.asset.asset
+      const title = regForm.title || `Registrasi Kedatangan - ${asset.code}`
+      await apiRequest('/work-orders/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: asset.id,
+          title,
+          description: regForm.description,
+        })
+      })
+      setShowRegModal(false)
+      setRegForm({ asset: null, title: '', description: '' })
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil',
+        text: 'Registrasi kedatangan berhasil disimpan.',
+        timer: 1500,
+        showConfirmButton: false,
+      })
+      loadData(true)
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: err instanceof ApiError ? err.message : 'Gagal registrasi kedatangan.',
+      })
+    } finally {
+      setRegSubmitting(false)
+    }
+  }
+
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      backgroundColor: 'rgb(30 41 59 / 0.5)',
+      borderColor: state.isFocused ? '#3b82f6' : 'rgb(51 65 85)',
+      color: 'white',
+      borderRadius: '0.75rem',
+      padding: '2px',
+      boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+      '&:hover': { borderColor: '#3b82f6' },
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: 'rgb(30 41 59)',
+      border: '1px solid rgb(51 65 85)',
+      borderRadius: '0.75rem',
+      overflow: 'hidden',
+      zIndex: 50,
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#3b82f6' : state.isFocused ? 'rgb(51 65 85)' : 'transparent',
+      color: 'white',
+      cursor: 'pointer',
+      '&:active': { backgroundColor: '#2563eb' },
+    }),
+    singleValue: (base) => ({ ...base, color: 'white', fontSize: '0.875rem' }),
+    input: (base) => ({ ...base, color: 'white' }),
+    placeholder: (base) => ({ ...base, color: 'rgb(148 163 184)', fontSize: '0.875rem' }),
+    indicatorSeparator: (base) => ({ ...base, backgroundColor: 'rgb(51 65 85)' }),
+    dropdownIndicator: (base) => ({ ...base, color: 'rgb(148 163 184)', '&:hover': { color: 'white' } }),
+    clearIndicator: (base) => ({ ...base, color: 'rgb(148 163 184)', '&:hover': { color: 'white' } })
+  }
 
   const isRowFinished = (row, byProcess = false) => {
     const woStatus = String(row?.wo_status || row?.status || '').toLowerCase()
@@ -287,7 +378,10 @@ export function WorkshopControlTowerPage() {
               <h2 className="text-lg font-bold">Workshop Control</h2>
               <p className="text-sm text-slate-400">Dashboard antrean step dan SLA gap realtime workshop.</p>
             </div>
-            <button onClick={handleReload} className="px-4 py-2 rounded-xl text-sm border border-slate-600 text-slate-200 hover:bg-slate-700/50">Muat Ulang</button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowRegModal(true)} className="px-4 py-2 rounded-xl text-sm bg-blue-600 text-white font-medium hover:bg-blue-700">Input Kedatangan</button>
+              <button onClick={handleReload} className="px-4 py-2 rounded-xl text-sm border border-slate-600 text-slate-200 hover:bg-slate-700/50">Muat Ulang</button>
+            </div>
           </>
         )}
       </div>
@@ -476,6 +570,60 @@ export function WorkshopControlTowerPage() {
           </div>
         </ModalPortal>
       ) : null}
+      {showRegModal && (
+        <ModalPortal>
+          <div className="w-full h-full overflow-y-auto hide-scrollbar py-6 flex items-start justify-center" onClick={() => setShowRegModal(false)}>
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-5 border-b border-slate-700 flex items-center justify-between">
+                <h3 className="text-lg font-bold">Input Kedatangan</h3>
+                <button onClick={() => setShowRegModal(false)} className="text-slate-400 hover:text-white">Tutup</button>
+              </div>
+              <form onSubmit={handleRegisterArrival} className="p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Aset / Unit <span className="text-red-400">*</span></label>
+                  <AsyncSelect
+                    cacheOptions
+                    defaultOptions
+                    loadOptions={loadAssets}
+                    styles={selectStyles}
+                    placeholder="Cari code, name, io_code..."
+                    value={regForm.asset}
+                    onChange={(val) => setRegForm({ ...regForm, asset: val, title: val ? `Registrasi Kedatangan - ${val.asset.code}` : '' })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Judul / Title <span className="text-red-400">*</span></label>
+                  <input
+                    required
+                    type="text"
+                    value={regForm.title}
+                    onChange={(e) => setRegForm({ ...regForm, title: e.target.value })}
+                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Contoh: Registrasi Kedatangan - DT001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Keluhan / Temuan Kerusakan <span className="text-red-400">*</span></label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={regForm.description}
+                    onChange={(e) => setRegForm({ ...regForm, description: e.target.value })}
+                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Jelaskan detail masalah..."
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-700 mt-4 pt-4">
+                  <button type="button" onClick={() => setShowRegModal(false)} className="px-4 py-2 rounded-xl text-sm border border-slate-600 text-slate-200 hover:bg-slate-700/50">Batal</button>
+                  <button type="submit" disabled={regSubmitting || !regForm.asset || !regForm.title || !regForm.description} className="px-4 py-2 rounded-xl text-sm bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {regSubmitting ? 'Menyimpan...' : 'Simpan'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   )
 }
