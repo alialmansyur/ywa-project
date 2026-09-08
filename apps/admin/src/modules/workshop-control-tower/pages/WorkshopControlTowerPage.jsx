@@ -68,7 +68,7 @@ export function WorkshopControlTowerPage() {
 
   const loadAssets = async (inputValue) => {
     try {
-      const res = await apiRequest(`/assets?q=${encodeURIComponent(inputValue)}&per_page=20`)
+      const res = await apiRequest(`/assets?search=${encodeURIComponent(inputValue)}&per_page=1000`)
       const items = res?.data || []
       return items.map(a => ({
         label: `${a.code} - ${a.name} ${a.io_code ? `(${a.io_code})` : ''}`,

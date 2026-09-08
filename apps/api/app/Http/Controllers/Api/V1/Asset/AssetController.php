@@ -92,7 +92,7 @@ class AssetController extends Controller
             })
             ->orderBy($request->sort_by ?? 'created_at', $request->sort_dir ?? 'desc');
 
-        $perPage = max(1, min((int) ($request->per_page ?? 15), 100));
+        $perPage = max(1, min((int) ($request->per_page ?? 15), 1000));
         $assets = $query->paginate($perPage);
 
         return response()->json($assets);
